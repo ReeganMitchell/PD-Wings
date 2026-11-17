@@ -77,7 +77,13 @@ before relying on frame-timing assumptions.
 
 Start with a small number of modules and split only as the code needs it:
 
-- `main.c` — Jo Engine initialization, shared setup, and callback registration.
+- `main.c` — Jo Engine initialization and callback registration.
+- `src/game.c/.h` — application game setup, game-loop orchestration, and the
+  current game reset path.
+- `src/game_state.h` — runtime state shared by game, input, player, and level code.
+- `src/input.c/.h` — controller polling and movement input.
+- `src/level.c/.h` — map and texture loading, reset, and drawing.
+- `src/player.c/.h` — shared movement, collision, animation, and player drawing.
 - `game_flow.c/.h` — active state, transition requests, and state lifecycle.
 - `level.c/.h` — zone/level metadata, map loading, and spawn/camera setup.
 - `player.c/.h` — shared movement and collision logic, parameterized by
@@ -288,6 +294,18 @@ Build the smallest scene that exercises all three technical goals:
    correctly during the cutscene.
 8. Confirm transitions and rendering in an emulator.
 
+### Current prototype status
+
+The current prototype is split across `src/game.c`, `src/input.c`,
+`src/player.c`, and `src/level.c`; `main.c` is limited to Jo Engine initialization and starting the
+game. It starts directly in `DEMO2.MAP`, uses one shared movement/collision
+path, and lets X switch between two temporary character profiles. Both
+profiles currently reuse `SNC.BIN`; their only test difference is max speed
+(6 versus 5), so replace these placeholders with the actual character assets
+and design parameters when available. The map scrolls with the player and
+uses Jo Engine's vertical and hitbox collision helpers. CD audio is also
+enabled and the test `audio/track1.wav` is started as CD track 2.
+
 The vertical slice should prove the shared character path and a representative
 level-to-boss progression and one cutscene handoff, not implement all six
 zones, every scene, the final boss, or after-story content. Add the
@@ -299,11 +317,9 @@ decided.
 
 ## Project-specific starting point
 
-The current project is a small demo: `main.c` initializes Jo Engine, loads a
-TGA sprite, and draws it from a callback. Its `makefile` currently enables TGA
-but disables the audio and 3D modules. The existing project file should remain
-the build entry point; this plan does not require changing it until the
-relevant prototypes are ready.
+The current project is a small playable prototype with map-based gameplay,
+CD audio, and a 3D model background. Its `makefile` enables the TGA, audio,
+filesystem, and 3D modules. The project makefile remains the build entry point.
 
 See [JOENGINE_REFERENCE.md](./JOENGINE_REFERENCE.md) for verified engine and
 project facts that inform this plan.

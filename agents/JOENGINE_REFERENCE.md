@@ -10,12 +10,49 @@ version is identical.
 - The project is `Projects/PD_wings` inside the Jo Engine checkout.
 - The engine source and compiler folders are referenced by the project
   `makefile` as `../../jo_engine` and `../../Compiler`.
-- `main.c` currently contains only Jo Engine startup, a TGA sprite load, and a
-  draw callback.
+- `main.c` initializes Jo Engine and starts the game. The `src/` directory
+  contains `game.c` for loop/setup coordination, `input.c` for input,
+  `player.c` for player behavior, and `level.c` for level loading/drawing.
+  Shared runtime state is declared in `src/game_state.h`.
 - The project `makefile` has `JO_COMPILE_WITH_TGA_MODULE = 1`,
-  `JO_COMPILE_WITH_AUDIO_MODULE = 0`, and `JO_COMPILE_WITH_3D_MODULE = 0`.
-- The existing build lists `main.c` in `SRCS`; add any new C implementation
-  files there.
+  `JO_COMPILE_WITH_AUDIO_MODULE = 1`, `JO_COMPILE_WITH_FS_MODULE = 1`,
+  `JO_COMPILE_WITH_SPRITE_HASHTABLE = 1`, and
+  `JO_COMPILE_WITH_3D_MODULE = 1`.
+- CD audio files are read from `audio/`; the current `track1.wav` is CD audio
+  track 2 because track 1 contains game data.
+- `JO_CD_SECTOR_SIZE = 2352` builds a combined `game.bin` disc image so the cue
+  sheet references that single file instead of the nested `audio/track1.wav`
+  path rejected by Mednafen's default path security check.
+- The project `makefile` explicitly lists the application modules in `SRCS`
+  and adds `src/` to the include path; add each new C implementation file
+  there.
+- VS Code C/C++ IntelliSense paths and Jo Engine feature defines are configured
+  in `.vscode/c_cpp_properties.json`; keep it aligned with the project makefile.
+
+## Current test assets and controls
+
+- The test map is `cd/LVL/TEST/MAP/DEMO2.MAP`. Its sprites are listed in
+  `cd/LVL/TEST/TEX/TEST.TEX` and loaded from `cd/LVL/TEST/TEX/`. The
+  background model is `cd/LVL/TEST/MOD/HOUSE.JOM`; it is loaded with
+  `jo_3d_load_model()` and drawn before the 2D map and player. Its 3D
+  camera follows the level map's horizontal and vertical offsets at one-third
+  scale; the model's original transform stays fixed to preserve its orientation.
+- `jo_fs_cd()` and the file-loading `sub_dir` arguments accept one directory
+  component, not a slash-separated path. Navigate one directory at a time
+  (`LVL`, then `TEST`), pass the leaf directory (`TEX` or `MAP`) to the loader,
+  then return with `JO_PARENT_DIR`. The character sheet is loaded by navigating
+  to `CHAR/TEST` and passing `JO_CURRENT_DIR`.
+- The player frames are cut from `cd/CHAR/TEST/SNC.BIN` as eight 48 x 56
+  frames. `SNC3.BIN` is not currently used by the prototype.
+- The two temporary profiles share the same sprite sheet and controller.
+  Their max speeds differ only to exercise profile-driven tuning; these are
+  placeholders, not final character design.
+- Horizontal camera movement retains fractional speed between frames and
+  applies whole-pixel scroll steps, avoiding forced one-pixel movement at
+  subpixel speeds.
+- D-pad moves, A jumps, X switches test profiles, and START resets the level.
+- The test loop starts CD track 2 on repeat after loading CD files, avoiding
+  loading assets from the drive while music is already playing.
 
 ## Core loop and callbacks
 
@@ -59,11 +96,13 @@ Primary sources: `jo_engine/jo/map.h`, `Samples/demo - map/main.c`,
 
 ## 3D support
 
-- The project currently disables `JO_COMPILE_WITH_3D_MODULE`; set it to `1`
-  when using Jo Engine's 3D APIs.
+- The project enables `JO_COMPILE_WITH_3D_MODULE` and the matching
+  `JO_COMPILE_WITH_3D_SUPPORT` IntelliSense define.
 - The 3D module exposes camera and 3D drawing APIs. The `demo - 3D map` sample
   shows initializing a camera, setting its viewpoint, and drawing under a
   matrix push/pop.
+- `jo_3d_load_model()` reads a `.JOM` model from the current CD directory.
+  Models may embed textures; this test model contains its texture data.
 - Test actual layer composition when combining 3D geometry with the 2D map,
   sprites, and foreground effects. A particular draw order or transparency
   outcome should not be assumed without a prototype.
@@ -73,8 +112,8 @@ Primary sources: `jo_engine/jo/3d.h`,
 
 ## Audio and CD music
 
-- The project currently disables `JO_COMPILE_WITH_AUDIO_MODULE`; enable it to
-  use Jo Engine audio APIs.
+- The project enables `JO_COMPILE_WITH_AUDIO_MODULE` to use Jo Engine audio
+  APIs.
 - CD-track playback APIs are declared under
   `JO_COMPILE_WITH_FS_SUPPORT`. Explicitly enable
   `JO_COMPILE_WITH_FS_MODULE = 1` for a project that loads map/assets from the
