@@ -36,10 +36,10 @@ void game_loop(void)
     level_draw_background(&g_game.level);
     level_draw(&g_game.level);
     player_draw(&g_game.player);
-    jo_printf(0, 0, "TEST LEVEL - %s",
+    jo_printf(0, 0, "LEVEL - %s",
               player_get_character_name(&g_game.player));
     jo_printf(0, 1, "D-PAD: move  A: jump  X: switch  START: reset");
-    jo_printf(0, 2, "Same test sprite; max speed: %d",
+    jo_printf(0, 2, "IDLE/RUN animations  max speed: %d",
               player_get_max_speed(&g_game.player));
     jo_printf(0, 3, "Ground: %s  Wall: %s",
               g_game.player.physics.is_in_air ? "no" : "yes",

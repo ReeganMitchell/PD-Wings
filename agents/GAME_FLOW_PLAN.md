@@ -73,6 +73,30 @@ A regular frame should have an intentional order:
 The exact Jo Engine callback timing should be confirmed with a small prototype
 before relying on frame-timing assumptions.
 
+## Frame-rate-independent gameplay
+
+PAL and NTSC builds refresh at 50 Hz and 60 Hz respectively. With the current
+`JO_FRAMERATE = 1` setting, the game callback runs once per VBlank, so code
+that advances physics or timers by a fixed amount per callback runs about 20%
+faster in NTSC than PAL. The current prototype's acceleration, gravity,
+horizontal scrolling, and animation cadence are frame-based and therefore do
+not yet have equivalent real-time behavior in both versions.
+
+Before expanding gameplay, make simulation and timed behavior independent of
+the video standard. Choose and document one timing approach—elapsed-time
+scaled updates or a fixed simulation step with an accumulator—and apply it
+consistently to movement, acceleration, gravity, jump behavior, animations,
+power-up duration/meter gain, invulnerability/cooldowns, cutscene timing, and
+other gameplay timers. Input should be sampled in a way that remains
+responsive if a video frame runs zero or multiple simulation steps. Avoid
+fixing this with unrelated PAL-specific constants scattered through gameplay.
+
+Validate both builds using real elapsed time, not just frame counts. Compare
+time to reach top speed, jump airtime and height, distance traveled, animation
+duration, and timed gameplay events between PAL and NTSC. Differences should
+stay within an explicitly chosen tolerance while each version renders at its
+own regional refresh rate.
+
 ## Responsibilities and likely source layout
 
 Start with a small number of modules and split only as the code needs it:
@@ -320,6 +344,27 @@ decided.
 The current project is a small playable prototype with map-based gameplay,
 CD audio, and a 3D model background. Its `makefile` enables the TGA, audio,
 filesystem, and 3D modules. The project makefile remains the build entry point.
+
+## PAL and NTSC support
+
+The game should run as separate PAL or NTSC builds, selected at compile time.
+The project makefile defaults to PAL and accepts `JO_NTSC=1` for NTSC; use
+`make JO_NTSC=0 all` for PAL and `make JO_NTSC=1 all` for NTSC. Building the
+other version rebuilds Jo Engine objects with the matching regional timing and
+screen definitions. A single binary does not switch television standards at
+runtime.
+
+Jo Engine's default resolution is 320 x 256 in PAL and 320 x 240 in NTSC.
+Gameplay layout, camera limits, HUD placement, and cutscene/UI safe areas must
+be checked in both builds so the extra PAL height does not become a dependency.
+VS Code provides matching PAL and NTSC IntelliSense configurations; select the
+same configuration as the build being worked on.
+
+The regional refresh rates also differ: PAL is 50 Hz and NTSC is 60 Hz.
+Regional builds must preserve gameplay speed and timed behavior in real time;
+see [Frame-rate-independent gameplay](#frame-rate-independent-gameplay). The
+current prototype still uses frame-based Jo Engine physics and requires this
+follow-up before its timing can be considered equivalent across regions.
 
 See [JOENGINE_REFERENCE.md](./JOENGINE_REFERENCE.md) for verified engine and
 project facts that inform this plan.

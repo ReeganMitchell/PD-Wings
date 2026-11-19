@@ -18,6 +18,16 @@ version is identical.
   `JO_COMPILE_WITH_AUDIO_MODULE = 1`, `JO_COMPILE_WITH_FS_MODULE = 1`,
   `JO_COMPILE_WITH_SPRITE_HASHTABLE = 1`, and
   `JO_COMPILE_WITH_3D_MODULE = 1`.
+- The project defaults to PAL (`JO_NTSC = 0`); build NTSC with
+  `make JO_NTSC=1 all`. Jo Engine defaults to 320 x 256 in PAL and
+  320 x 240 in NTSC when screen dimensions are not explicitly set.
+- With the default `JO_FRAMERATE = 1`, the game loop runs once per VBlank:
+  PAL provides 50 updates per second and NTSC 60. Physics and timers advanced
+  by fixed per-callback amounts are therefore not equivalent in real time;
+  the current test movement is frame-based.
+- `.vscode/c_cpp_properties.json` has separate PAL and NTSC configurations;
+  select the configuration matching the active build to keep platform macros
+  accurate in IntelliSense.
 - CD audio files are read from `audio/`; the current `track1.wav` is CD audio
   track 2 because track 1 contains game data.
 - `JO_CD_SECTOR_SIZE = 2352` builds a combined `game.bin` disc image so the cue
@@ -40,17 +50,23 @@ version is identical.
 - `jo_fs_cd()` and the file-loading `sub_dir` arguments accept one directory
   component, not a slash-separated path. Navigate one directory at a time
   (`LVL`, then `TEST`), pass the leaf directory (`TEX` or `MAP`) to the loader,
-  then return with `JO_PARENT_DIR`. The character sheet is loaded by navigating
-  to `CHAR/TEST` and passing `JO_CURRENT_DIR`.
-- The player frames are cut from `cd/CHAR/TEST/SNC.BIN` as eight 48 x 56
-  frames. `SNC3.BIN` is not currently used by the prototype.
-- The two temporary profiles share the same sprite sheet and controller.
-  Their max speeds differ only to exercise profile-driven tuning; these are
-  placeholders, not final character design.
+  then return with `JO_PARENT_DIR`. Character sheets are loaded by navigating
+  into each directory under `CHAR` and passing `JO_CURRENT_DIR`.
+- REI is the first playable character. Its `IDLE.BIN` contains fifteen
+  48 x 48 frames and `RUN.BIN` contains eight 48 x 48 frames. SAM is the
+  second playable character; its `IDLE.BIN` contains ten 48 x 48 frames and
+  `RUN.BIN` contains eight 48 x 48 frames. The old TEST spritesheet is no
+  longer loaded by the game.
+- REI and SAM share the current movement/controller logic, but use their own
+  animation sheets and max-speed tuning. X switches between them.
+- Player collision uses a stable body rectangle within the 48 x 48 frame
+  (x=14..34, y=10..39); ground contact is at the visible feet, and wall probes
+  use the matching left or right body edge.
 - Horizontal camera movement retains fractional speed between frames and
   applies whole-pixel scroll steps, avoiding forced one-pixel movement at
   subpixel speeds.
-- D-pad moves, A jumps, X switches test profiles, and START resets the level.
+- D-pad moves, A jumps, X switches between REI and SAM, and START resets the
+  level.
 - The test loop starts CD track 2 on repeat after loading CD files, avoiding
   loading assets from the drive while music is already playing.
 
