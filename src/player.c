@@ -11,11 +11,8 @@
 #define PLAYER_COLLISION_RIGHT      (35)
 #define PLAYER_COLLISION_TOP        (10)
 #define PLAYER_COLLISION_BOTTOM     (40)
-#define PLAYER_COLLISION_MIDPOINT   ((PLAYER_COLLISION_TOP + PLAYER_COLLISION_BOTTOM) / 2)
-#define PLAYER_COLLISION_LOOKAHEAD  (4)
-#define MAP_TILE_FLAT_ATTR          (1)
-#define MAP_TILE_SLOPE_RIGHT_ATTR   (2)
-#define MAP_TILE_SLOPE_LEFT_ATTR    (3)
+#define PLAYER_WALL_PROBE_BOTTOM    (PLAYER_COLLISION_BOTTOM - 16)
+#define PLAYER_STEP_UP_MAX          (8)
 #define JUMP_PER_PIXEL_TOLERANCE    (20)
 #define PLAYER_MAX_ANIMATION_FRAMES (15)
 #define PLAYER_IDLE_FRAME_RATE      (6)
@@ -130,16 +127,63 @@ static player_character *current_character(const player_state *player)
     return &g_characters[player->character_index];
 }
 
+static int find_step_up_correction(const game_state *game)
+{
+    const player_state *player = &game->player;
+    int foot_y = game->level.map_y + player->y +
+                 PLAYER_COLLISION_BOTTOM;
+    int movement_delta = (int)(
+        player->horizontal_remainder + player->physics.speed);
+    int probe_x;
+    int probe_y;
+
+    if (movement_delta == 0)
+        return 0;
+    probe_x = game->level.map_x + player->x + PLAYER_WIDTH_2 +
+              movement_delta;
+
+    for (probe_y = foot_y - 1;
+         probe_y >= foot_y - PLAYER_STEP_UP_MAX;
+         --probe_y)
+    {
+        int distance = jo_map_per_pixel_vertical_collision(
+            GAME_COLLISION_MAP_ID, probe_x, probe_y, JO_NULL);
+        int correction;
+
+        if (distance == JO_MAP_NO_COLLISION)
+            continue;
+        correction = probe_y + distance - foot_y;
+        if (correction < 0 &&
+            correction >= -PLAYER_STEP_UP_MAX)
+            return correction;
+    }
+
+    return 0;
+}
+
 static bool check_vertical_collision(game_state *game)
 {
     player_state *player = &game->player;
     int distance;
+    int step_up;
+    bool was_grounded = !player->physics.is_in_air;
 
     player->can_jump = false;
     if (player->physics.speed_y < 0.0f)
     {
         player->physics.is_in_air = true;
         return false;
+    }
+    if (was_grounded && player->physics.speed != 0.0f)
+    {
+        step_up = find_step_up_correction(game);
+        if (step_up < 0)
+        {
+            player->y += step_up;
+            player->can_jump = true;
+            player->physics.is_in_air = false;
+            return true;
+        }
     }
     distance = jo_map_per_pixel_vertical_collision(
         GAME_COLLISION_MAP_ID,
@@ -161,42 +205,27 @@ static bool check_vertical_collision(game_state *game)
     return true;
 }
 
-static bool check_horizontal_collision(game_state *game)
+static bool has_wall_at_map_x(const game_state *game,
+                              int map_x,
+                              int direction)
 {
-    player_state *player = &game->player;
-    int next_x;
-    int probe_x;
-    int attribute;
+    const player_state *player = &game->player;
+    int wall_x = map_x + player->x +
+        (direction > 0 ? PLAYER_COLLISION_RIGHT - 1 :
+         PLAYER_COLLISION_LEFT);
+    int y;
 
-    if (jo_physics_is_going_on_the_right(&player->physics))
+    for (y = game->level.map_y + player->y + PLAYER_COLLISION_TOP;
+         y < game->level.map_y + player->y +
+                 PLAYER_WALL_PROBE_BOTTOM;
+         ++y)
     {
-        next_x = player->x + PLAYER_COLLISION_LOOKAHEAD;
-        probe_x = next_x + PLAYER_COLLISION_RIGHT;
+        int distance = jo_map_per_pixel_vertical_collision(
+            GAME_COLLISION_MAP_ID, wall_x, y, JO_NULL);
+
+        if (distance != JO_MAP_NO_COLLISION && distance <= 0)
+            return true;
     }
-    else if (jo_physics_is_going_on_the_left(&player->physics))
-    {
-        next_x = player->x - PLAYER_COLLISION_LOOKAHEAD;
-        probe_x = next_x + PLAYER_COLLISION_LEFT;
-    }
-    else
-    {
-        next_x = player->x;
-        probe_x = next_x + PLAYER_COLLISION_RIGHT;
-    }
-    attribute = jo_map_hitbox_detection_custom_boundaries(
-        GAME_COLLISION_MAP_ID,
-        game->level.map_x + probe_x,
-        game->level.map_y + player->y + PLAYER_COLLISION_MIDPOINT,
-        1,
-        1);
-    if (attribute == JO_MAP_NO_COLLISION)
-        return false;
-    if (attribute == MAP_TILE_FLAT_ATTR)
-        return true;
-    if (attribute == MAP_TILE_SLOPE_RIGHT_ATTR)
-        return !jo_physics_is_going_on_the_right(&player->physics);
-    if (attribute == MAP_TILE_SLOPE_LEFT_ATTR)
-        return !jo_physics_is_going_on_the_left(&player->physics);
     return false;
 }
 
@@ -281,6 +310,8 @@ void player_update(game_state *game)
 {
     player_state *player = &game->player;
     int horizontal_delta;
+    int direction;
+    int step;
 
     if (check_vertical_collision(game))
         player->physics.speed_y = 0.0f;
@@ -290,18 +321,34 @@ void player_update(game_state *game)
         player->y += (int)player->physics.speed_y;
     }
 
-    player->wall_collision = check_horizontal_collision(game);
-    if (player->wall_collision)
+    player->horizontal_remainder += player->physics.speed;
+    horizontal_delta = (int)player->horizontal_remainder;
+    player->horizontal_remainder -= horizontal_delta;
+    direction = horizontal_delta > 0 ? 1 :
+        horizontal_delta < 0 ? -1 : 0;
+    player->wall_collision = false;
+    for (step = 0; step < JO_ABS(horizontal_delta); ++step)
     {
-        player->physics.speed = 0.0f;
-        player->horizontal_remainder = 0.0f;
+        int next_map_x = game->level.map_x + direction;
+
+        if (has_wall_at_map_x(game, next_map_x, direction))
+        {
+            player->wall_collision = true;
+            player->physics.speed = 0.0f;
+            player->horizontal_remainder = 0.0f;
+            break;
+        }
+        game->level.map_x = next_map_x;
     }
-    else
+
+    if (!player->wall_collision)
     {
-        player->horizontal_remainder += player->physics.speed;
-        horizontal_delta = (int)player->horizontal_remainder;
-        player->horizontal_remainder -= horizontal_delta;
-        game->level.map_x += horizontal_delta;
+        direction = player->physics.speed > 0.0f ? 1 :
+            player->physics.speed < 0.0f ? -1 :
+            player->facing_left ? -1 : 1;
+        if (has_wall_at_map_x(
+                game, game->level.map_x + direction, direction))
+            player->wall_collision = true;
     }
 
     if (player->y > 100)

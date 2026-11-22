@@ -62,11 +62,15 @@ version is identical.
   longer loaded by the game.
 - REI and SAM share the current movement/controller logic, but use their own
   animation sheets and max-speed tuning. X switches between them.
-- Player collision uses a stable body rectangle within the 48 x 48 frame
-  (x=14..34, y=10..39); ground contact is at the visible feet, and wall probes
-  use the matching left or right body edge at the body's midpoint. Flat mask
-  tiles use attribute 1, right-rising slopes use 2, and left-rising slopes use
-  3. The horizontal probe allows movement only along the slope's rise direction.
+- Player ground collision uses `jo_map_per_pixel_vertical_collision()` at the
+  visible feet and Jo's Sonic-style gravity/jump helpers. Ground and slope
+  response comes from collision-mask pixels rather than map attributes.
+  Grounded movement probes the center-foot position at a short
+  movement-direction lookahead and scans up to eight pixels upward to step
+  onto rising slopes across tile seams.
+  Horizontal movement checks the leading body edge against collision-mask
+  pixels one map pixel at a time. Wall probes omit the bottom 16 pixels of the
+  body so slope contact is handled by ground projection rather than a wall hit.
 - Horizontal camera movement retains fractional speed between frames and
   applies whole-pixel scroll steps, avoiding forced one-pixel movement at
   subpixel speeds.
