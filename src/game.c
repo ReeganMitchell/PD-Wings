@@ -31,9 +31,7 @@ void game_loop(void)
     input_update_movement(&g_game);
     player_update(&g_game);
     player_update_animation(&g_game.player);
-
     jo_clear_screen();
-    level_draw_background(&g_game.level);
     level_draw(&g_game.level);
     player_draw(&g_game.player);
     jo_printf(0, 0, "LEVEL - %s",

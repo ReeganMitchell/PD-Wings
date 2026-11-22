@@ -4,18 +4,22 @@
 #include "level.h"
 #include "player.h"
 
-#define PLAYER_START_X              (160)
-#define PLAYER_START_Y              (70)
+#define PLAYER_START_X              (100)
+#define PLAYER_START_Y              (250)
 #define PLAYER_WIDTH_2              (GAME_PLAYER_WIDTH / 2)
 #define PLAYER_COLLISION_LEFT       (14)
 #define PLAYER_COLLISION_RIGHT      (35)
 #define PLAYER_COLLISION_TOP        (10)
 #define PLAYER_COLLISION_BOTTOM     (40)
+#define PLAYER_COLLISION_MIDPOINT   ((PLAYER_COLLISION_TOP + PLAYER_COLLISION_BOTTOM) / 2)
 #define PLAYER_COLLISION_LOOKAHEAD  (4)
-#define MAP_TILE_BLOCK_ATTR         (1)
+#define MAP_TILE_FLAT_ATTR          (1)
+#define MAP_TILE_SLOPE_RIGHT_ATTR   (2)
+#define MAP_TILE_SLOPE_LEFT_ATTR    (3)
 #define JUMP_PER_PIXEL_TOLERANCE    (20)
 #define PLAYER_MAX_ANIMATION_FRAMES (15)
 #define PLAYER_IDLE_FRAME_RATE      (6)
+#define PLAYER_DRAW_DEPTH           (250)
 
 typedef struct
 {
@@ -138,7 +142,7 @@ static bool check_vertical_collision(game_state *game)
         return false;
     }
     distance = jo_map_per_pixel_vertical_collision(
-        GAME_WORLD_MAP_ID,
+        GAME_COLLISION_MAP_ID,
         game->level.map_x + player->x + PLAYER_WIDTH_2,
         game->level.map_y + player->y + PLAYER_COLLISION_BOTTOM,
         JO_NULL);
@@ -180,12 +184,20 @@ static bool check_horizontal_collision(game_state *game)
         probe_x = next_x + PLAYER_COLLISION_RIGHT;
     }
     attribute = jo_map_hitbox_detection_custom_boundaries(
-        GAME_WORLD_MAP_ID,
+        GAME_COLLISION_MAP_ID,
         game->level.map_x + probe_x,
-        game->level.map_y + player->y + PLAYER_COLLISION_TOP,
+        game->level.map_y + player->y + PLAYER_COLLISION_MIDPOINT,
         1,
-        PLAYER_COLLISION_BOTTOM - PLAYER_COLLISION_TOP);
-    return attribute == MAP_TILE_BLOCK_ATTR;
+        1);
+    if (attribute == JO_MAP_NO_COLLISION)
+        return false;
+    if (attribute == MAP_TILE_FLAT_ATTR)
+        return true;
+    if (attribute == MAP_TILE_SLOPE_RIGHT_ATTR)
+        return !jo_physics_is_going_on_the_right(&player->physics);
+    if (attribute == MAP_TILE_SLOPE_LEFT_ATTR)
+        return !jo_physics_is_going_on_the_left(&player->physics);
+    return false;
 }
 
 bool player_load_assets(player_state *player)
@@ -333,7 +345,7 @@ void player_draw(const player_state *player)
 
     if (player->facing_left)
         jo_sprite_enable_horizontal_flip();
-    jo_sprite_draw3D2(sprite_id, player->x, player->y, 450);
+    jo_sprite_draw3D2(sprite_id, player->x, player->y, PLAYER_DRAW_DEPTH);
     if (player->facing_left)
         jo_sprite_disable_horizontal_flip();
 }

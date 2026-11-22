@@ -39,19 +39,22 @@ version is identical.
 - VS Code C/C++ IntelliSense paths and Jo Engine feature defines are configured
   in `.vscode/c_cpp_properties.json`; keep it aligned with the project makefile.
 
-## Current test assets and controls
+## Current level assets and controls
 
-- The test map is `cd/LVL/TEST/MAP/DEMO2.MAP`. Its sprites are listed in
-  `cd/LVL/TEST/TEX/TEST.TEX` and loaded from `cd/LVL/TEST/TEX/`. The
-  background model is `cd/LVL/TEST/MOD/HOUSE.JOM`; it is loaded with
-  `jo_3d_load_model()` and drawn before the 2D map and player. Its 3D
-  camera follows the level map's horizontal and vertical offsets at one-third
-  scale; the model's original transform stays fixed to preserve its orientation.
+- The active graphics map is `cd/LVL/ZONE1/MAP/Z1A1G.MAP`; its sprites are listed
+  in `cd/LVL/ZONE1/TEX/Z1A1.TEX` and loaded from `cd/LVL/ZONE1/TEX/`. The
+  separate collision map is `cd/LVL/ZONE1/MAP/Z1A1C.MAP`; its mask sprites are
+  listed in `cd/LVL/ZONE1/TEX/Z1C.TEX`. The graphics map is drawn, while the
+  collision map is only queried. The player
+  starts near map coordinates (100, 250); the map offsets start at (0, 0).
+  The sky uses the VDP2 back-screen color. Map tiles draw at depth 300 and the
+  player at depth 250; 3D scenery should use a depth greater than 300 to stay
+  behind the map.
 - `jo_fs_cd()` and the file-loading `sub_dir` arguments accept one directory
   component, not a slash-separated path. Navigate one directory at a time
-  (`LVL`, then `TEST`), pass the leaf directory (`TEX` or `MAP`) to the loader,
-  then return with `JO_PARENT_DIR`. Character sheets are loaded by navigating
-  into each directory under `CHAR` and passing `JO_CURRENT_DIR`.
+  (`LVL`, then `ZONE1`), pass the leaf directory (`TEX` or `MAP`) to the
+  loader, then return with `JO_PARENT_DIR`. Character sheets are loaded by
+  navigating into each directory under `CHAR` and passing `JO_CURRENT_DIR`.
 - REI is the first playable character. Its `IDLE.BIN` contains fifteen
   48 x 48 frames and `RUN.BIN` contains eight 48 x 48 frames. SAM is the
   second playable character; its `IDLE.BIN` contains ten 48 x 48 frames and
@@ -61,13 +64,15 @@ version is identical.
   animation sheets and max-speed tuning. X switches between them.
 - Player collision uses a stable body rectangle within the 48 x 48 frame
   (x=14..34, y=10..39); ground contact is at the visible feet, and wall probes
-  use the matching left or right body edge.
+  use the matching left or right body edge at the body's midpoint. Flat mask
+  tiles use attribute 1, right-rising slopes use 2, and left-rising slopes use
+  3. The horizontal probe allows movement only along the slope's rise direction.
 - Horizontal camera movement retains fractional speed between frames and
   applies whole-pixel scroll steps, avoiding forced one-pixel movement at
   subpixel speeds.
 - D-pad moves, A jumps, X switches between REI and SAM, and START resets the
   level.
-- The test loop starts CD track 2 on repeat after loading CD files, avoiding
+- The game starts CD track 2 on repeat after loading CD files, avoiding
   loading assets from the drive while music is already playing.
 
 ## Core loop and callbacks

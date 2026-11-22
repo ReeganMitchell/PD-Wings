@@ -3,7 +3,8 @@
 
 #include <jo/jo.h>
 
-#define GAME_WORLD_MAP_ID       (0)
+#define GAME_GRAPHICS_MAP_ID    (0)
+#define GAME_COLLISION_MAP_ID   (1)
 #define GAME_PLAYER_WIDTH       (48)
 
 typedef struct

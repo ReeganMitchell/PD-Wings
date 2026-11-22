@@ -3,96 +3,63 @@
 #include "game_state.h"
 #include "level.h"
 
-#define LEVEL_START_X   (540)
-#define LEVEL_START_Y   (120)
-#define BACKGROUND_MODEL_Z (400)
-#define BACKGROUND_MODEL_SCALE (3)
-
-static jo_camera g_background_camera;
-static jo_3d_model *g_background_model;
+#define LEVEL_MAP_DEPTH (300)
+#define LEVEL_SKY_COLOR JO_COLOR_RGB(135, 206, 235)
 
 bool level_load_assets(void)
 {
+    jo_set_default_background_color(LEVEL_SKY_COLOR);
     if (!jo_fs_cd("LVL"))
     {
         jo_core_error("Failed to enter LVL directory: %s", jo_get_last_error());
         return false;
     }
-    if (!jo_fs_cd("TEST"))
+    if (!jo_fs_cd("ZONE1"))
     {
-        jo_core_error("Failed to enter test level directory: %s",
+        jo_core_error("Failed to enter ZONE1 directory: %s",
                       jo_get_last_error());
         return false;
     }
-    if (jo_sprite_add_image_pack("TEX", "TEST.TEX", JO_COLOR_Red) < 0)
+    if (jo_sprite_add_image_pack("TEX", "Z1A1.TEX", JO_COLOR_Green) < 0)
     {
-        jo_core_error("Failed to load test level texture pack: %s",
+        jo_core_error("Failed to load Z1A1 texture pack: %s",
                       jo_get_last_error());
         return false;
     }
     if (!jo_map_load_from_file(
-            GAME_WORLD_MAP_ID, 500, "MAP", "DEMO2.MAP"))
+            GAME_GRAPHICS_MAP_ID, LEVEL_MAP_DEPTH, "MAP", "Z1A1G.MAP"))
     {
-        jo_core_error("Failed to load test level map: %s", jo_get_last_error());
+        jo_core_error("Failed to load Z1A1 graphics map: %s", jo_get_last_error());
         return false;
     }
-    if (!jo_fs_cd("MOD"))
+    if (jo_sprite_add_image_pack("TEX", "Z1C.TEX", JO_COLOR_Green) < 0)
     {
-        jo_core_error("Failed to enter test level model directory: %s",
+        jo_core_error("Failed to load Z1A1 collision texture pack: %s",
                       jo_get_last_error());
         return false;
     }
-    g_background_model = jo_3d_load_model("HOUSE.JOM");
-    if (g_background_model == JO_NULL)
+    if (!jo_map_load_from_file(
+            GAME_COLLISION_MAP_ID, 0, "MAP", "Z1A1C.MAP"))
     {
-        jo_core_error("Failed to load 3D background model HOUSE.JOM: %s",
-                      jo_get_last_error());
+        jo_core_error("Failed to load Z1A1 collision map: %s", jo_get_last_error());
         return false;
     }
     if (!jo_fs_cd(JO_PARENT_DIR) ||
-        !jo_fs_cd(JO_PARENT_DIR) ||
         !jo_fs_cd(JO_PARENT_DIR))
     {
         jo_core_error("Failed to return to CD root: %s", jo_get_last_error());
         return false;
     }
-    jo_3d_camera_init(&g_background_camera);
     return true;
 }
 
 void level_reset(level_state *level)
 {
-    level->map_x = LEVEL_START_X;
-    level->map_y = LEVEL_START_Y;
+    level->map_x = 0;
+    level->map_y = 0;
 }
 
 void level_draw(const level_state *level)
 {
-    jo_map_draw(GAME_WORLD_MAP_ID, level->map_x, level->map_y);
-}
-
-void level_draw_background(const level_state *level)
-{
-    jo_fixed camera_offset_x;
-    jo_fixed camera_offset_y;
-
-    camera_offset_x = JO_FLOAT_TO_FIXED(
-        (float)(level->map_x - LEVEL_START_X) / BACKGROUND_MODEL_SCALE);
-    camera_offset_y = JO_FLOAT_TO_FIXED(
-        (float)(level->map_y - LEVEL_START_Y) / BACKGROUND_MODEL_SCALE);
-    g_background_camera.viewpoint_pos.x = camera_offset_x;
-    g_background_camera.target_pos.x = camera_offset_x;
-    g_background_camera.viewpoint_pos.y = camera_offset_y;
-    g_background_camera.target_pos.y = camera_offset_y;
-
-    jo_3d_push_matrix();
-    jo_3d_camera_look_at(&g_background_camera);
-    jo_3d_set_scale(
-        BACKGROUND_MODEL_SCALE,
-        BACKGROUND_MODEL_SCALE,
-        BACKGROUND_MODEL_SCALE);
-    jo_3d_translate_matrix(0, 20, BACKGROUND_MODEL_Z);
-    jo_3d_rotate_matrix_x(-20);
-    jo_3d_model_draw(g_background_model);
-    jo_3d_pop_matrix();
+    jo_map_draw(GAME_GRAPHICS_MAP_ID, level->map_x, level->map_y);
 }
