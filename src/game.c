@@ -31,15 +31,14 @@ void game_loop(void)
     input_update_movement(&g_game);
     player_update(&g_game);
     player_update_animation(&g_game.player);
-    jo_clear_screen();
     level_draw(&g_game.level);
     player_draw(&g_game.player);
-    jo_printf(0, 0, "LEVEL - %s",
+    jo_printf(0, 0, "LEVEL - %-12s",
               player_get_character_name(&g_game.player));
-    jo_printf(0, 1, "D-PAD: move  A: jump  X: switch  START: reset");
-    jo_printf(0, 2, "IDLE/RUN animations  max speed: %d",
+    jo_printf(0, 1, "D-PAD: move  A: jump  X: switch  START: reset          ");
+    jo_printf(0, 2, "IDLE/RUN animations  max speed: %-12d",
               player_get_max_speed(&g_game.player));
-    jo_printf(0, 3, "Ground: %s  Wall: %s",
+    jo_printf(0, 3, "Ground: %-3s  Wall: %-3s",
               g_game.player.physics.is_in_air ? "no" : "yes",
               g_game.player.wall_collision ? "yes" : "no");
 }

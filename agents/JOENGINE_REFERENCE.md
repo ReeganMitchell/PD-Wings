@@ -67,7 +67,8 @@ version is identical.
   response comes from collision-mask pixels rather than map attributes.
   Grounded movement probes the center-foot position at a short
   movement-direction lookahead and scans up to eight pixels upward to step
-  onto rising slopes across tile seams.
+  onto rising slopes across tile seams; it similarly projects down up to eight
+  pixels to keep grounded movement attached to descending slopes.
   Horizontal movement checks the leading body edge against collision-mask
   pixels one map pixel at a time. Wall probes omit the bottom 16 pixels of the
   body so slope contact is handled by ground projection rather than a wall hit.

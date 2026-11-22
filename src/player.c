@@ -13,6 +13,7 @@
 #define PLAYER_COLLISION_BOTTOM     (40)
 #define PLAYER_WALL_PROBE_BOTTOM    (PLAYER_COLLISION_BOTTOM - 16)
 #define PLAYER_STEP_UP_MAX          (8)
+#define PLAYER_STEP_DOWN_MAX        (8)
 #define JUMP_PER_PIXEL_TOLERANCE    (20)
 #define PLAYER_MAX_ANIMATION_FRAMES (15)
 #define PLAYER_IDLE_FRAME_RATE      (6)
@@ -161,11 +162,46 @@ static int find_step_up_correction(const game_state *game)
     return 0;
 }
 
+static int find_step_down_correction(const game_state *game)
+{
+    const player_state *player = &game->player;
+    int foot_y = game->level.map_y + player->y +
+                 PLAYER_COLLISION_BOTTOM;
+    int movement_delta = (int)(
+        player->horizontal_remainder + player->physics.speed);
+    int probe_x;
+    int probe_y;
+
+    if (movement_delta == 0)
+        return 0;
+    probe_x = game->level.map_x + player->x + PLAYER_WIDTH_2 +
+              movement_delta;
+
+    for (probe_y = foot_y;
+         probe_y <= foot_y + PLAYER_STEP_DOWN_MAX;
+         ++probe_y)
+    {
+        int distance = jo_map_per_pixel_vertical_collision(
+            GAME_COLLISION_MAP_ID, probe_x, probe_y, JO_NULL);
+        int correction;
+
+        if (distance == JO_MAP_NO_COLLISION)
+            continue;
+        correction = probe_y + distance - foot_y;
+        if (correction > 0 &&
+            correction <= PLAYER_STEP_DOWN_MAX)
+            return correction;
+    }
+
+    return 0;
+}
+
 static bool check_vertical_collision(game_state *game)
 {
     player_state *player = &game->player;
     int distance;
     int step_up;
+    int step_down;
     bool was_grounded = !player->physics.is_in_air;
 
     player->can_jump = false;
@@ -180,6 +216,14 @@ static bool check_vertical_collision(game_state *game)
         if (step_up < 0)
         {
             player->y += step_up;
+            player->can_jump = true;
+            player->physics.is_in_air = false;
+            return true;
+        }
+        step_down = find_step_down_correction(game);
+        if (step_down > 0)
+        {
+            player->y += step_down;
             player->can_jump = true;
             player->physics.is_in_air = false;
             return true;
