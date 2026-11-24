@@ -29,10 +29,13 @@ version is identical.
 - The project boot header retains the engine default area code `JTUE`, which
   supports Europe as well as Japan, Taiwan, and the USA. The shared build
   supports overriding this with `JO_GAME_AREA_CODE`.
-- With the default `JO_FRAMERATE = 1`, the game loop runs once per VBlank:
-  PAL provides 50 updates per second and NTSC 60. Physics and timers advanced
-  by fixed per-callback amounts are therefore not equivalent in real time;
-  the current test movement is frame-based.
+- Rendering runs once per VBlank, while gameplay simulation advances at a
+  fixed 60 updates per second in both PAL and NTSC. PAL frames run an average
+  of 1.2 simulation updates each; NTSC frames run one. Input edges are retained
+  until the next simulation update, and player animation advances with the
+  simulation rather than the render callback. To bound catch-up after a stall,
+  at most four simulation updates run per rendered frame; additional backlog is
+  discarded.
 - `.vscode/c_cpp_properties.json` has separate PAL and NTSC configurations;
   select the configuration matching the active build to keep platform macros
   accurate in IntelliSense.
@@ -84,7 +87,9 @@ version is identical.
   applies whole-pixel scroll steps, avoiding forced one-pixel movement at
   subpixel speeds.
 - D-pad moves, A jumps, X switches between REI and SAM, B toggles performance
-  diagnostics, and START resets the level.
+  diagnostics, and START resets the level. The HUD reports whether the first
+  pad is available, whether Up is pressed, and the raw active-low button mask
+  Jo Engine currently reads.
 - The game starts CD track 2 on repeat after loading CD files, avoiding
   loading assets from the drive while music is already playing.
 

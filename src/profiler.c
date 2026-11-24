@@ -34,7 +34,7 @@ void profiler_init(void)
 void profiler_update(void)
 {
     if (!jo_is_pad1_available() ||
-        !jo_is_pad1_key_pressed(JO_KEY_B))
+        !jo_is_pad1_key_down(JO_KEY_B))
         return;
 
     g_profiler_visible = !g_profiler_visible;

@@ -313,6 +313,7 @@ void player_reset(player_state *player)
     player->can_jump = true;
     player->wall_collision = false;
     player->horizontal_remainder = 0.0f;
+    player->animation_frame_skip = 0;
     player->active_animation_id = -1;
     for (i = 0; i < (int)(sizeof(g_characters) / sizeof(g_characters[0])); ++i)
     {
@@ -413,6 +414,8 @@ void player_update_animation(player_state *player)
     int animation_id = jo_physics_is_standing(&player->physics) ?
         character->idle_anim_id : character->run_anim_id;
     int speed_step;
+    unsigned char frame_rate;
+    unsigned short frame;
 
     if (animation_id != player->active_animation_id)
     {
@@ -420,14 +423,26 @@ void player_update_animation(player_state *player)
             jo_reset_sprite_anim(player->active_animation_id);
         jo_reset_sprite_anim(animation_id);
         player->active_animation_id = animation_id;
+        player->animation_frame_skip = 0;
     }
-    if (jo_is_sprite_anim_stopped(animation_id))
-        jo_start_sprite_anim_loop(animation_id);
     if (animation_id == character->idle_anim_id)
-        return;
-    speed_step = (int)JO_ABS(player->physics.speed);
-    jo_set_sprite_anim_frame_rate(
-        animation_id, 9 - JO_MIN(speed_step, 6));
+        frame_rate = jo_get_sprite_anim_frame_rate(animation_id);
+    else
+    {
+        speed_step = (int)JO_ABS(player->physics.speed);
+        frame_rate = (unsigned char)(9 - JO_MIN(speed_step, 6));
+        jo_set_sprite_anim_frame_rate(animation_id, frame_rate);
+    }
+    if (player->animation_frame_skip >= frame_rate)
+    {
+        player->animation_frame_skip = 0;
+        frame = (unsigned short)(jo_get_sprite_anim_frame(animation_id) + 1);
+        if (frame >= jo_get_sprite_anim_frame_count(animation_id))
+            frame = 0;
+        jo_set_sprite_anim_frame(animation_id, frame);
+    }
+    else
+        ++player->animation_frame_skip;
 }
 
 void player_draw(const player_state *player)

@@ -17,6 +17,7 @@ typedef struct
 {
     jo_sidescroller_physics_params physics;
     float horizontal_remainder;
+    unsigned char animation_frame_skip;
     int x;
     int y;
     int active_animation_id;
