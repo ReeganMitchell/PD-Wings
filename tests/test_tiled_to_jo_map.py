@@ -2,7 +2,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.tiled_to_jo_map import ExportError, _output_filename, export_map
+from tools.tiled_to_jo_map import (
+    ExportError,
+    _output_filename,
+    export_map,
+    export_model_placements,
+)
 
 
 class TiledToJoMapTests(unittest.TestCase):
@@ -142,6 +147,53 @@ class TiledToJoMapTests(unittest.TestCase):
         layers = export_map(self.map_path)
 
         self.assertEqual(layers[0].entries, ["SLOPE.TGA\t0\t0\t2"])
+
+    def test_exports_named_point_objects_as_normalized_model_positions(self):
+        self.map_path.write_text(
+            """<map orientation="orthogonal" width="2" height="2" tilewidth="32" tileheight="32" infinite="1">
+  <tileset firstgid="1" source="tiles.tsx"/>
+  <layer name="Graphics" width="1" height="1">
+    <data encoding="csv">1</data>
+  </layer>
+  <objectgroup name="Objects" offsetx="4" offsety="-8">
+    <object id="1" name="House_1" x="96.6667" y="-608.667"><point/></object>
+  </objectgroup>
+</map>""",
+            encoding="utf-8",
+        )
+
+        placements = export_model_placements(
+            self.map_path,
+            origin_x=0,
+            origin_y=-32,
+        )
+
+        self.assertEqual(len(placements), 1)
+        self.assertEqual(placements[0].filename, "HOUSE.JOM")
+        self.assertEqual(placements[0].x, 101)
+        self.assertEqual(placements[0].y, 407)
+
+    def test_model_object_property_overrides_name(self):
+        self.map_path.write_text(
+            """<map orientation="orthogonal" width="1" height="1" tilewidth="32" tileheight="32" infinite="1">
+  <tileset firstgid="1" source="tiles.tsx"/>
+  <layer name="Graphics" width="1" height="1">
+    <data encoding="csv">1</data>
+  </layer>
+  <objectgroup name="Objects">
+    <object id="1" name="Building_A" x="32" y="64">
+      <properties><property name="joengineModel" value="Warehou.JOM"/></properties>
+      <point/>
+    </object>
+  </objectgroup>
+</map>""",
+            encoding="utf-8",
+        )
+
+        placements = export_model_placements(self.map_path)
+
+        self.assertEqual(placements[0].filename, "WAREHOU.JOM")
+        self.assertEqual((placements[0].x, placements[0].y), (32, 64))
 
 
 if __name__ == "__main__":

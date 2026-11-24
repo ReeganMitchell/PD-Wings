@@ -40,6 +40,13 @@ class TileLayer:
     entries: list[str]
 
 
+@dataclass(frozen=True)
+class ModelPlacement:
+    filename: str
+    x: int
+    y: int
+
+
 def _jo_filename(source: str, extension: str, override: str | None) -> str:
     if override:
         filename = override.strip().upper()
@@ -465,6 +472,85 @@ def _output_filename(prefix: str, layer_name: str, index: int) -> str:
     return f"{prefix}_{index:02}.MAP"
 
 
+def _object_properties(obj: ET.Element) -> dict[str, str]:
+    properties = obj.find("properties")
+    if properties is None:
+        return {}
+    return {
+        prop.attrib["name"]: prop.attrib.get("value", prop.text or "")
+        for prop in properties.findall("property")
+        if "name" in prop.attrib
+    }
+
+
+def _model_filename(obj: ET.Element) -> str:
+    override = _object_properties(obj).get("joengineModel")
+    name = override.strip() if override else obj.attrib.get("name", "").strip()
+    if not name:
+        raise ExportError("Tiled object in an ObjectLayer has no name")
+    if not override:
+        name = name.split("_", 1)[0]
+    if not name.lower().endswith(".jom"):
+        name = f"{name}.JOM"
+    return _jo_filename(name, ".JOM", name)
+
+
+def export_model_placements(
+    map_path: Path,
+    origin_x: int = 0,
+    origin_y: int = 0,
+    tile_width: int = 0,
+    tile_height: int = 0,
+) -> list[ModelPlacement]:
+    try:
+        root = ET.parse(map_path).getroot()
+    except (OSError, ET.ParseError) as exc:
+        raise ExportError(f"cannot read map {map_path}: {exc}") from exc
+    if root.tag != "map":
+        raise ExportError("input file is not a Tiled TMX map")
+
+    if tile_width <= 0:
+        tile_width = int(root.attrib["tilewidth"])
+    if tile_height <= 0:
+        tile_height = int(root.attrib["tileheight"])
+
+    placements: list[ModelPlacement] = []
+
+    def visit(parent: ET.Element, parent_pixel_x: float, parent_pixel_y: float) -> None:
+        for child in parent:
+            if child.tag == "objectgroup":
+                pixel_x = parent_pixel_x + float(child.attrib.get("offsetx", "0"))
+                pixel_y = parent_pixel_y + float(child.attrib.get("offsety", "0"))
+                for obj in child.findall("object"):
+                    if obj.find("point") is None:
+                        continue
+                    try:
+                        raw_x = float(obj.attrib["x"]) + pixel_x
+                        raw_y = float(obj.attrib["y"]) + pixel_y
+                    except (KeyError, ValueError) as exc:
+                        raise ExportError(
+                            f"object {obj.attrib.get('name', 'unnamed')!r} "
+                            "has invalid coordinates"
+                        ) from exc
+                    x = round(raw_x - (origin_x * tile_width))
+                    y = round(raw_y - (origin_y * tile_height))
+                    if not (-32768 <= x <= 32767 and -32768 <= y <= 32767):
+                        raise ExportError(
+                            f"object {obj.attrib.get('name', 'unnamed')!r} "
+                            f"coordinate ({x}, {y}) is out of range"
+                        )
+                    placements.append(ModelPlacement(_model_filename(obj), x, y))
+            elif child.tag == "group":
+                visit(
+                    child,
+                    parent_pixel_x + float(child.attrib.get("offsetx", "0")),
+                    parent_pixel_y + float(child.attrib.get("offsety", "0")),
+                )
+
+    visit(root, 0.0, 0.0)
+    return placements
+
+
 def _read_image_names(path: Path | None) -> dict[str, str]:
     if path is None:
         return {}
@@ -508,6 +594,12 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="JSON mapping from tileset image basenames to runtime filenames",
     )
+    parser.add_argument(
+        "--mod-output-dir",
+        type=Path,
+        default=None,
+        help="destination for .MODMAP files (default: sibling MOD directory)",
+    )
     args = parser.parse_args(argv)
 
     extension = args.image_extension.upper()
@@ -533,6 +625,52 @@ def main(argv: list[str] | None = None) -> int:
                 newline="\n",
             )
             print(f"{output_path}: {layer.name} ({len(layer.entries)} tiles)")
+
+        root = ET.parse(args.map).getroot()
+        tile_width = int(root.attrib["tilewidth"])
+        tile_height = int(root.attrib["tileheight"])
+        origin_x = 0
+        origin_y = 0
+        chunk_y = []
+        for layer in root.findall(".//layer"):
+            data = layer.find("data")
+            chunks = data.findall("chunk") if data is not None else []
+            if chunks:
+                origin_x = min(
+                    min(origin_x, int(layer.attrib.get("x", "0")) +
+                        int(chunk.attrib["x"]))
+                    for chunk in chunks
+                )
+                chunk_y.extend(
+                    int(layer.attrib.get("y", "0")) + int(chunk.attrib["y"])
+                    for chunk in chunks
+                )
+        if chunk_y:
+            origin_y = min(chunk_y)
+
+        placements = export_model_placements(
+            args.map,
+            origin_x,
+            origin_y,
+            tile_width,
+            tile_height,
+        )
+        if placements:
+            mod_output_dir = args.mod_output_dir or (output_dir.parent / "MOD")
+            mod_output_dir.mkdir(parents=True, exist_ok=True)
+            mod_output_path = mod_output_dir / f"{prefix}.MODMAP"
+            mod_output_path.write_text(
+                "".join(
+                    f"{placement.filename}\t{placement.x}\t{placement.y}\n"
+                    for placement in placements
+                ),
+                encoding="ascii",
+                newline="\n",
+            )
+            print(
+                f"{mod_output_path}: "
+                f"{len(placements)} 3D model placement(s)"
+            )
     except (ExportError, OSError, ValueError, KeyError) as exc:
         print(f"tiled_to_jo_map: error: {exc}", file=sys.stderr)
         return 1

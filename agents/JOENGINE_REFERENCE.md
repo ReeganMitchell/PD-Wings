@@ -16,11 +16,19 @@ version is identical.
   Shared runtime state is declared in `src/game_state.h`.
 - The project `makefile` has `JO_COMPILE_WITH_TGA_MODULE = 1`,
   `JO_COMPILE_WITH_AUDIO_MODULE = 1`, `JO_COMPILE_WITH_FS_MODULE = 1`,
+  `JO_COMPILE_WITH_PROFILER_MODULE = 1`,
   `JO_COMPILE_WITH_SPRITE_HASHTABLE = 1`, and
   `JO_COMPILE_WITH_3D_MODULE = 1`.
+- Press B to toggle the performance overlay. It shows Jo Engine profiler
+  timings plus FPS, late frames, dynamic memory usage, and fragmentation.
+  `src/profiler.c` owns the overlay, and `game.c` times the game update and
+  draw phases with user profiler slots.
 - The project defaults to PAL (`JO_NTSC = 0`); build NTSC with
   `make JO_NTSC=1 all`. Jo Engine defaults to 320 x 256 in PAL and
   320 x 240 in NTSC when screen dimensions are not explicitly set.
+- The project boot header retains the engine default area code `JTUE`, which
+  supports Europe as well as Japan, Taiwan, and the USA. The shared build
+  supports overriding this with `JO_GAME_AREA_CODE`.
 - With the default `JO_FRAMERATE = 1`, the game loop runs once per VBlank:
   PAL provides 50 updates per second and NTSC 60. Physics and timers advanced
   by fixed per-callback amounts are therefore not equivalent in real time;
@@ -75,8 +83,8 @@ version is identical.
 - Horizontal camera movement retains fractional speed between frames and
   applies whole-pixel scroll steps, avoiding forced one-pixel movement at
   subpixel speeds.
-- D-pad moves, A jumps, X switches between REI and SAM, and START resets the
-  level.
+- D-pad moves, A jumps, X switches between REI and SAM, B toggles performance
+  diagnostics, and START resets the level.
 - The game starts CD track 2 on repeat after loading CD files, avoiding
   loading assets from the drive while music is already playing.
 

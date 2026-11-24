@@ -44,6 +44,20 @@ Only orthogonal tile layers are exported. Object/image layers are ignored;
 flipped/rotated tiles, fractional offsets, unsupported encodings, and names
 that exceed Jo Engine's filename limits are reported as errors.
 
+Point objects in Tiled ObjectLayers are exported as a separate `.MODMAP`
+file in the sibling `MOD` directory (or `--mod-output-dir`). The filename is
+`<prefix>.MODMAP`, such as `Z1A1.MODMAP`. `House_1` maps to `HOUSE.JOM`;
+instances with a numeric or descriptive suffix use the text before `_`.
+Set a custom `joengineModel` property on an object to override the JOM
+filename. Each line is:
+
+```text
+HOUSE.JOM	97	415
+```
+
+Object coordinates are normalized against the same infinite-map origin used
+for the exported tile MAP files.
+
 Run the exporter tests with:
 
 ```sh
