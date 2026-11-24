@@ -19,6 +19,16 @@
 #define PLAYER_IDLE_FRAME_RATE      (6)
 #define PLAYER_DRAW_DEPTH           (250)
 
+#define REI_MAX_SPEED (3)
+#define REI_GROUND_ACCELERATION (JO_FIXED_1 / 4)
+#define REI_AIR_ACCELERATION (JO_FIXED_1 * 3 / 32)
+#define REI_FRICTION (JO_FIXED_1 * 2 / 25)
+
+#define SAM_MAX_SPEED (4)
+#define SAM_GROUND_ACCELERATION (JO_FIXED_1 / 4)
+#define SAM_AIR_ACCELERATION (JO_FIXED_1 * 3 / 32)
+#define SAM_FRICTION (JO_FIXED_1 * 2 / 25)
+
 typedef struct
 {
     const char *name;
@@ -28,9 +38,9 @@ typedef struct
     unsigned short idle_frame_count;
     unsigned short run_frame_count;
     int max_speed;
-    float ground_acceleration;
-    float air_acceleration;
-    float friction;
+    jo_fixed ground_acceleration;
+    jo_fixed air_acceleration;
+    jo_fixed friction;
     int sprite_height;
     bool shares_animation_sheet;
     int idle_anim_id;
@@ -39,8 +49,17 @@ typedef struct
 
 static player_character g_characters[] =
 {
-    {"REI", "REI", "IDLE.BIN", "RUN.BIN", 15, 8, 3, 0.25f, 0.09375f, 0.08f, 48, false, -1, -1},
-    {"SAM", "SAM", "IDLE.BIN", "RUN.BIN", 10, 8, 4, 0.25f, 0.09375f, 0.08f, 48, false, -1, -1}
+    {
+        "REI", "REI", 
+        "IDLE.BIN", "RUN.BIN", 15, 8, 
+        REI_MAX_SPEED, REI_GROUND_ACCELERATION, REI_AIR_ACCELERATION, REI_FRICTION, 
+        48, false, -1, -1
+    },
+    {
+        "SAM", "SAM", "IDLE.BIN", "RUN.BIN", 10, 8, 
+        SAM_MAX_SPEED,SAM_GROUND_ACCELERATION, SAM_AIR_ACCELERATION, SAM_FRICTION, 
+        48, false, -1, -1
+    }
 };
 
 static void create_frame_tileset(jo_tile *tiles, int frame_count, int height)
@@ -136,7 +155,7 @@ static int find_step_up_correction(const game_state *game)
     const player_state *player = &game->player;
     int foot_y = game->level.map_y + player->y +
                  PLAYER_COLLISION_BOTTOM;
-    int movement_delta = (int)(
+    int movement_delta = JO_FIXED_TO_INT(
         player->horizontal_remainder + player->physics.speed);
     int probe_x;
     int probe_y;
@@ -170,7 +189,7 @@ static int find_step_down_correction(const game_state *game)
     const player_state *player = &game->player;
     int foot_y = game->level.map_y + player->y +
                  PLAYER_COLLISION_BOTTOM;
-    int movement_delta = (int)(
+    int movement_delta = JO_FIXED_TO_INT(
         player->horizontal_remainder + player->physics.speed);
     int probe_x;
     int probe_y;
@@ -208,12 +227,12 @@ static bool check_vertical_collision(game_state *game)
     bool was_grounded = !player->physics.is_in_air;
 
     player->can_jump = false;
-    if (player->physics.speed_y < 0.0f)
+    if (player->physics.speed_y < JO_FIXED_0)
     {
         player->physics.is_in_air = true;
         return false;
     }
-    if (was_grounded && player->physics.speed != 0.0f)
+    if (was_grounded && player->physics.speed != JO_FIXED_0)
     {
         step_up = find_step_up_correction(game);
         if (step_up < 0)
@@ -221,6 +240,7 @@ static bool check_vertical_collision(game_state *game)
             player->y += step_up;
             player->can_jump = true;
             player->physics.is_in_air = false;
+            player->vertical_remainder = JO_FIXED_0;
             return true;
         }
         step_down = find_step_down_correction(game);
@@ -245,7 +265,7 @@ static bool check_vertical_collision(game_state *game)
         player->physics.is_in_air = true;
         return false;
     }
-    if (distance < 0 && jo_is_float_equals_zero(player->physics.speed_y))
+    if (distance < 0 && player->physics.speed_y == JO_FIXED_0)
         player->y += distance;
     player->can_jump = true;
     player->physics.is_in_air = false;
@@ -315,16 +335,18 @@ void player_reset(player_state *player)
     player->facing_left = false;
     player->can_jump = true;
     player->wall_collision = false;
-    player->horizontal_remainder = 0.0f;
+    player->horizontal_remainder = JO_FIXED_0;
+    player->vertical_remainder = JO_FIXED_0;
     player->animation_frame_skip = 0;
-    player->active_animation_id = -1;
     for (i = 0; i < (int)(sizeof(g_characters) / sizeof(g_characters[0])); ++i)
     {
         jo_reset_sprite_anim(g_characters[i].idle_anim_id);
         jo_reset_sprite_anim(g_characters[i].run_anim_id);
     }
+    player->active_animation_id = current_character(player)->idle_anim_id;
     jo_physics_init_for_sonic(&player->physics);
-    player->physics.max_speed = current_character(player)->max_speed;
+    player->physics.max_speed =
+        JO_INT_TO_FIXED(current_character(player)->max_speed);
     player->physics.acceleration_strength =
         current_character(player)->ground_acceleration;
     player->physics.air_acceleration_strength =
@@ -342,7 +364,8 @@ void player_select_next_character(player_state *player)
         character_count;
     player->y += previous_character->sprite_height -
         current_character(player)->sprite_height;
-    player->physics.max_speed = current_character(player)->max_speed;
+    player->physics.max_speed =
+        JO_INT_TO_FIXED(current_character(player)->max_speed);
     player->physics.acceleration_strength =
         current_character(player)->ground_acceleration;
     player->physics.air_acceleration_strength =
@@ -368,20 +391,27 @@ void player_update(game_state *game)
 {
     player_state *player = &game->player;
     int horizontal_delta;
+    int vertical_delta;
     int direction;
     int step;
 
     if (check_vertical_collision(game))
-        player->physics.speed_y = 0.0f;
+    {
+        player->physics.speed_y = JO_FIXED_0;
+        player->vertical_remainder = JO_FIXED_0;
+    }
     else
     {
         jo_physics_apply_gravity(&player->physics);
-        player->y += (int)player->physics.speed_y;
+        player->vertical_remainder += player->physics.speed_y;
+        vertical_delta = JO_FIXED_TO_INT(player->vertical_remainder);
+        player->vertical_remainder -= JO_INT_TO_FIXED(vertical_delta);
+        player->y += vertical_delta;
     }
 
     player->horizontal_remainder += player->physics.speed;
-    horizontal_delta = (int)player->horizontal_remainder;
-    player->horizontal_remainder -= horizontal_delta;
+    horizontal_delta = JO_FIXED_TO_INT(player->horizontal_remainder);
+    player->horizontal_remainder -= JO_INT_TO_FIXED(horizontal_delta);
     direction = horizontal_delta > 0 ? 1 :
         horizontal_delta < 0 ? -1 : 0;
     player->wall_collision = false;
@@ -392,8 +422,8 @@ void player_update(game_state *game)
         if (has_wall_at_map_x(game, next_map_x, direction))
         {
             player->wall_collision = true;
-            player->physics.speed = 0.0f;
-            player->horizontal_remainder = 0.0f;
+            player->physics.speed = JO_FIXED_0;
+            player->horizontal_remainder = JO_FIXED_0;
             break;
         }
         game->level.map_x = next_map_x;
@@ -401,8 +431,8 @@ void player_update(game_state *game)
 
     if (!player->wall_collision)
     {
-        direction = player->physics.speed > 0.0f ? 1 :
-            player->physics.speed < 0.0f ? -1 :
+        direction = player->physics.speed > JO_FIXED_0 ? 1 :
+            player->physics.speed < JO_FIXED_0 ? -1 :
             player->facing_left ? -1 : 1;
         if (has_wall_at_map_x(
                 game, game->level.map_x + direction, direction))
@@ -442,7 +472,7 @@ void player_update_animation(player_state *player)
         frame_rate = jo_get_sprite_anim_frame_rate(animation_id);
     else
     {
-        speed_step = (int)JO_ABS(player->physics.speed);
+        speed_step = JO_FIXED_TO_INT(JO_ABS(player->physics.speed));
         frame_rate = (unsigned char)(9 - JO_MIN(speed_step, 6));
         jo_set_sprite_anim_frame_rate(animation_id, frame_rate);
     }

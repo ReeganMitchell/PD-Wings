@@ -73,7 +73,8 @@ version is identical.
   longer loaded by the game.
 - REI and SAM share the current movement/controller logic, but use their own
   animation sheets, max-speed tuning, and separate ground/air acceleration
-  settings and friction settings. X switches between them.
+  settings and friction settings. Physics tuning and accumulated subpixel
+  movement use Jo's Q16.16 `jo_fixed` representation. X switches between them.
 - Player ground collision uses `jo_map_per_pixel_vertical_collision()` at the
   visible feet and Jo's Sonic-style gravity/jump helpers. Ground and slope
   response comes from collision-mask pixels rather than map attributes.

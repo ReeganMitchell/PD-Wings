@@ -16,7 +16,8 @@ typedef struct
 typedef struct
 {
     jo_sidescroller_physics_params physics;
-    float horizontal_remainder;
+    jo_fixed horizontal_remainder;
+    jo_fixed vertical_remainder;
     unsigned char animation_frame_skip;
     int x;
     int y;

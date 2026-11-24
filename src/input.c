@@ -76,6 +76,7 @@ void input_update_movement(game_state *game)
     if (player->can_jump && g_jump_pressed)
     {
         player->can_jump = false;
+        player->vertical_remainder = JO_FIXED_0;
         jo_physics_jump(&player->physics);
     }
 }
