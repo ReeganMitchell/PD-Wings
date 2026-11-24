@@ -28,6 +28,9 @@ typedef struct
     unsigned short idle_frame_count;
     unsigned short run_frame_count;
     int max_speed;
+    float ground_acceleration;
+    float air_acceleration;
+    float friction;
     int sprite_height;
     bool shares_animation_sheet;
     int idle_anim_id;
@@ -36,8 +39,8 @@ typedef struct
 
 static player_character g_characters[] =
 {
-    {"REI", "REI", "IDLE.BIN", "RUN.BIN", 15, 8, 4, 48, false, -1, -1},
-    {"SAM", "SAM", "IDLE.BIN", "RUN.BIN", 10, 8, 5, 48, false, -1, -1}
+    {"REI", "REI", "IDLE.BIN", "RUN.BIN", 15, 8, 3, 0.25f, 0.09375f, 0.08f, 48, false, -1, -1},
+    {"SAM", "SAM", "IDLE.BIN", "RUN.BIN", 10, 8, 4, 0.25f, 0.09375f, 0.08f, 48, false, -1, -1}
 };
 
 static void create_frame_tileset(jo_tile *tiles, int frame_count, int height)
@@ -322,6 +325,11 @@ void player_reset(player_state *player)
     }
     jo_physics_init_for_sonic(&player->physics);
     player->physics.max_speed = current_character(player)->max_speed;
+    player->physics.acceleration_strength =
+        current_character(player)->ground_acceleration;
+    player->physics.air_acceleration_strength =
+        current_character(player)->air_acceleration;
+    player->physics.friction = current_character(player)->friction;
 }
 
 void player_select_next_character(player_state *player)
@@ -335,6 +343,11 @@ void player_select_next_character(player_state *player)
     player->y += previous_character->sprite_height -
         current_character(player)->sprite_height;
     player->physics.max_speed = current_character(player)->max_speed;
+    player->physics.acceleration_strength =
+        current_character(player)->ground_acceleration;
+    player->physics.air_acceleration_strength =
+        current_character(player)->air_acceleration;
+    player->physics.friction = current_character(player)->friction;
     if (player->physics.speed > player->physics.max_speed)
         player->physics.speed = player->physics.max_speed;
     else if (player->physics.speed < -player->physics.max_speed)

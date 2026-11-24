@@ -72,7 +72,8 @@ version is identical.
   `RUN.BIN` contains eight 48 x 48 frames. The old TEST spritesheet is no
   longer loaded by the game.
 - REI and SAM share the current movement/controller logic, but use their own
-  animation sheets and max-speed tuning. X switches between them.
+  animation sheets, max-speed tuning, and separate ground/air acceleration
+  settings and friction settings. X switches between them.
 - Player ground collision uses `jo_map_per_pixel_vertical_collision()` at the
   visible feet and Jo's Sonic-style gravity/jump helpers. Ground and slope
   response comes from collision-mask pixels rather than map attributes.
