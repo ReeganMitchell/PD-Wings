@@ -5,7 +5,9 @@
 
 static bool g_left_held;
 static bool g_right_held;
+static bool g_down_held;
 static bool g_jump_pressed;
+static bool g_attack_pressed;
 static bool g_character_switch_pressed;
 static bool g_reset_pressed;
 
@@ -15,7 +17,9 @@ void input_capture_frame(void)
     {
         g_left_held = false;
         g_right_held = false;
+        g_down_held = false;
         g_jump_pressed = false;
+        g_attack_pressed = false;
         g_character_switch_pressed = false;
         g_reset_pressed = false;
         return;
@@ -23,7 +27,9 @@ void input_capture_frame(void)
 
     g_left_held = jo_is_pad1_key_pressed(JO_KEY_LEFT);
     g_right_held = jo_is_pad1_key_pressed(JO_KEY_RIGHT);
-    g_jump_pressed |= jo_is_pad1_key_down(JO_KEY_A);
+    g_down_held = jo_is_pad1_key_pressed(JO_KEY_DOWN);
+    g_jump_pressed |= jo_is_pad1_key_down(JO_KEY_C);
+    g_attack_pressed |= jo_is_pad1_key_down(JO_KEY_B);
     g_character_switch_pressed |= jo_is_pad1_key_down(JO_KEY_X);
     g_reset_pressed |= jo_is_pad1_key_down(JO_KEY_START);
 }
@@ -31,14 +37,29 @@ void input_capture_frame(void)
 void input_end_simulation_step(void)
 {
     g_jump_pressed = false;
+    g_attack_pressed = false;
     g_character_switch_pressed = false;
     g_reset_pressed = false;
 }
 
-void input_update_character_selection(game_state *game)
+bool input_character_switch_requested(void)
 {
-    if (g_character_switch_pressed)
-        player_select_next_character(&game->player);
+    return g_character_switch_pressed;
+}
+
+bool input_update_character_selection(game_state *game)
+{
+    return player_select_next_character(&game->player);
+}
+
+void input_update_actions(game_state *game)
+{
+    player_state *player = &game->player;
+
+    player_set_down_move(
+        player, g_down_held && (g_left_held || g_right_held));
+    if (g_attack_pressed)
+        player_start_attack(player);
 }
 
 bool input_reset_requested(void)

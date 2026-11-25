@@ -30,10 +30,21 @@ static void game_update_simulation(void)
            steps < MAX_SIMULATION_STEPS_PER_FRAME)
     {
         jo_profile_begin(JO_PROFILE_USER(0));
-        input_update_character_selection(&g_game);
+        if (input_character_switch_requested())
+        {
+            bool resume_cd = jo_audio_is_cd_playing() &&
+                             !jo_audio_is_cd_paused();
+
+            if (resume_cd)
+                jo_audio_pause_cd();
+            input_update_character_selection(&g_game);
+            if (resume_cd)
+                jo_audio_resume_cd();
+        }
         if (input_reset_requested())
             game_reset();
         input_update_movement(&g_game);
+        input_update_actions(&g_game);
         player_update(&g_game);
         player_update_animation(&g_game.player);
         jo_profile_end(JO_PROFILE_USER(0));
@@ -76,9 +87,10 @@ void game_loop(void)
     player_draw(&g_game.player);
     jo_printf(0, 0, "LEVEL - %-12s",
               player_get_character_name(&g_game.player));
-    jo_printf(0, 1, "D-PAD A:jump X:char B:perf START:reset");
-    jo_printf(0, 2, "IDLE/RUN animations  max speed: %-12d",
-              player_get_max_speed(&g_game.player));
+    jo_printf(0, 1, "C:jump B:atk X:char Y:prof START:reset");
+    jo_printf(0, 2, "MAX SPD:%-2d SPRITE VRAM:%d%%",
+              player_get_max_speed(&g_game.player),
+              jo_sprite_usage_percent());
     jo_printf(0, 3, "PAD:%-3s UP:%-8s RAW:%04X",
               jo_is_pad1_available() ? "yes" : "no",
               jo_is_pad1_key_pressed(JO_KEY_UP) ? "PRESSED" : "RELEASED",

@@ -34,7 +34,7 @@ void profiler_init(void)
 void profiler_update(void)
 {
     if (!jo_is_pad1_available() ||
-        !jo_is_pad1_key_down(JO_KEY_B))
+        !jo_is_pad1_key_down(JO_KEY_Y))
         return;
 
     g_profiler_visible = !g_profiler_visible;
@@ -63,7 +63,7 @@ void profiler_draw(void)
 
     jo_profile_print(0, PROFILER_FIRST_LINE);
     jo_printf(0, PROFILER_FOOTER_LINE,
-              "%d FPS late:%d mem:%d%% frag:%d B:hide",
+              "%d FPS late:%d mem:%d%% frag:%d Y:hide",
               jo_core_get_fps(),
               jo_core_get_late_frame_count(),
               g_memory_usage,

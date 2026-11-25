@@ -23,6 +23,8 @@ typedef struct
     int y;
     int active_animation_id;
     int character_index;
+    bool down_move_active;
+    bool attack_animation_active;
     bool facing_left;
     bool can_jump;
     bool wall_collision;

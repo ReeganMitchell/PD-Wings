@@ -87,3 +87,27 @@ make pixels with alpha 0 through 127 transparent. TGA is written in 24-bit RGB,
 so partial transparency is flattened rather than preserved. The output name is
 the input basename plus `.TGA`; existing files are left untouched unless
 `--overwrite` is given. Use `--key-color RRGGBB` to choose another key color.
+
+## Convert PNG sprites to Jo Engine BIN
+
+Convert a PNG spritesheet into Jo Engine's 16-bit Saturn RGB555 `.BIN` format:
+
+```sh
+python3 tools/png_to_jo_bin.py "path/to/sprite.png" \
+  --output cd/CHAR/REI/IDLE.BIN
+```
+
+The file starts with little-endian 16-bit width and height values, followed by
+one 16-bit pixel per image pixel. Bit 15 marks opaque pixels; transparent
+pixels are zero. RGB channels are reduced to five bits each, matching Jo
+Engine's `JO_COLOR_RGB` and BIN loader. Partial alpha is opaque by default;
+use `--alpha-threshold 127` to treat alpha values 0 through 127 as transparent.
+Pass a directory instead of a file and `--output-dir` to batch-convert PNGs.
+Existing output files are not overwritten unless `--overwrite` is given.
+Use `--output` for a single file when you need to choose the runtime filename.
+
+Run the converter tests with:
+
+```sh
+python3 -m unittest discover -s tests -p test_png_to_jo_bin.py
+```

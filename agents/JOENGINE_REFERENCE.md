@@ -19,7 +19,7 @@ version is identical.
   `JO_COMPILE_WITH_PROFILER_MODULE = 1`,
   `JO_COMPILE_WITH_SPRITE_HASHTABLE = 1`, and
   `JO_COMPILE_WITH_3D_MODULE = 1`.
-- Press B to toggle the performance overlay. It shows Jo Engine profiler
+- Press Y to toggle the performance overlay. It shows Jo Engine profiler
   timings plus FPS, late frames, dynamic memory usage, and fragmentation.
   `src/profiler.c` owns the overlay, and `game.c` times the game update and
   draw phases with user profiler slots.
@@ -66,15 +66,18 @@ version is identical.
   (`LVL`, then `ZONE1`), pass the leaf directory (`TEX` or `MAP`) to the
   loader, then return with `JO_PARENT_DIR`. Character sheets are loaded by
   navigating into each directory under `CHAR` and passing `JO_CURRENT_DIR`.
-- REI is the first playable character. Its `IDLE.BIN` contains fifteen
-  48 x 48 frames and `RUN.BIN` contains eight 48 x 48 frames. SAM is the
-  second playable character; its `IDLE.BIN` contains ten 48 x 48 frames and
-  `RUN.BIN` contains eight 48 x 48 frames. The old TEST spritesheet is no
-  longer loaded by the game.
-- REI and SAM share the current movement/controller logic, but use their own
-  animation sheets, max-speed tuning, and separate ground/air acceleration
-  settings and friction settings. Physics tuning and accumulated subpixel
-  movement use Jo's Q16.16 `jo_fixed` representation. X switches between them.
+- REI is the first playable character and SAM is the second. Shared movement
+  and animation orchestration are in `src/player.c`; their character and
+  animation-sheet definitions are in `src/player_rei.c` and
+  `src/player_sam.c`. Both use separate 48 x 48 jump and wall-cling sheets.
+  REI additionally has roll and two shooting sheets; SAM has slide, a
+  96 x 48-frame sword stab sheet, and an air-spin sheet. Physics tuning and
+  accumulated subpixel movement use Jo's Q16.16 `jo_fixed` representation.
+  Only the selected character's sheets are kept in sprite memory. X replaces
+  that character's contiguous sprite block with the next character's sheets;
+  the CD audio is paused while those files are loaded. This relies on player
+  sprites remaining the last sprites allocated, so other runtime sprite assets
+  must not be added after them without revisiting this lifetime strategy.
 - Player ground collision uses `jo_map_per_pixel_vertical_collision()` at the
   visible feet and Jo's Sonic-style gravity/jump helpers. Ground and slope
   response comes from collision-mask pixels rather than map attributes.
@@ -88,8 +91,9 @@ version is identical.
 - Horizontal camera movement retains fractional speed between frames and
   applies whole-pixel scroll steps, avoiding forced one-pixel movement at
   subpixel speeds.
-- D-pad moves, A jumps, X switches between REI and SAM, B toggles performance
-  diagnostics, and START resets the level. The HUD reports whether the first
+- D-pad moves, C jumps, B starts the character's attack animation, X switches
+  between REI and SAM, Y toggles performance diagnostics, and START resets the
+  level. The HUD reports whether the first
   pad is available, whether Up is pressed, and the raw active-low button mask
   Jo Engine currently reads.
 - The game starts CD track 2 on repeat after loading CD files, avoiding

@@ -150,11 +150,52 @@ portrait presentation for zone introductions and boss lead-ins.
 
 Keep character selection separate from zone/level progression. The selected
 character should persist as the player advances through levels and zones,
-unless a deliberate story or game-over flow changes it. Have both characters
-use the same input, movement, collision, camera, and level-transition
-systems. Represent their slight differences through a small character
-definition (for example sprite/animation set and any genuinely different
-movement parameters); avoid duplicating the player controller.
+unless a deliberate story or game-over flow changes it. Both characters share
+the same core movement, collision, camera, and level-transition systems, but
+their combat actions are behaviorally distinct. Keep the shared controller
+and dispatch character-specific actions through explicit character data or
+small action handlers rather than duplicating the whole player controller.
+
+The current character design is:
+
+- **REI** is ranged and shoots arrows in the direction pressed. Moving while
+  pressing down performs a roll with invulnerability; REI can shoot during
+  the roll. Shooting down while airborne performs a pseudo-double-jump.
+- **SAM** is melee. Moving while pressing down performs a damaging slide.
+  SAM's air spin attack damages enemies and bounces off them.
+- Both characters share the `player new jump` jump animation and the
+  `player wall land` wall-cling animation.
+- Current prototype controls are D-pad movement, C to jump, B to trigger an
+  attack animation, X to switch characters, Y to toggle the profiler, and
+  START to reset the level. Attack button behavior is animation-only for now;
+  projectile, damage, invulnerability, and enemy-bounce mechanics are not yet
+  implemented.
+
+Planned animation sheets, sourced from `projFiles/Nov 16th (woodcutting
+animation added)/`, belong to these character sets:
+
+| Character | Action | Animation sheet |
+|-----------|--------|-----------------|
+| REI | Roll | `Roll Quick/Player Roll 48x48.png` |
+| REI | Stationary shooting | `Shooting (two-handed)/player shoot 2H 48x48.png` |
+| REI | Running/jumping shooting | `Shooting (running and aiming)/Player Running Shooting 48x48.png` |
+| SAM | Slide | `Slide/Player Slide 48x48.png` |
+| SAM | Ground attack | `Sword Stab/Player Sword Stab 96x48.png` |
+| SAM | Air attack | `Air Spin/player air spin 48x48.png` |
+| Both | Jump | `Jump/player new jump 48x48.png` |
+| Both | Wall cling | `Wall Land/player wall land 48x48.png` |
+
+Jo Engine sprite memory is limited VDP1 VRAM. Keep only the selected
+character's animation sheets loaded; replace that character's sprite block
+when switching rather than loading every animation set at startup. Because
+Jo Engine frees sprites from an ID through the end of the sprite list, this
+approach requires character sprites to remain the last allocated block or a
+future resource manager to handle dependent sprite lifetimes explicitly.
+
+Keep the shared action definitions and behavior consistent between characters.
+Exact directional-input rules and action timing,
+cooldowns, hitboxes, invulnerability duration, and enemy-bounce response still
+need to be specified and tested when gameplay implementation begins.
 
 Each character has its own meter that fills during gameplay. When full, it
 triggers that character's powered-up state, which may change the character's
