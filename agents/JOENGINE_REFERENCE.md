@@ -71,13 +71,12 @@ version is identical.
   animation-sheet definitions are in `src/player_rei.c` and
   `src/player_sam.c`. Both use separate 48 x 48 jump and wall-cling sheets.
   REI additionally has roll and two shooting sheets; SAM has slide, a
-  96 x 48-frame sword stab sheet, and an air-spin sheet. Physics tuning and
-  accumulated subpixel movement use Jo's Q16.16 `jo_fixed` representation.
-  Only the selected character's sheets are kept in sprite memory. X replaces
-  that character's contiguous sprite block with the next character's sheets;
-  the CD audio is paused while those files are loaded. This relies on player
-  sprites remaining the last sprites allocated, so other runtime sprite assets
-  must not be added after them without revisiting this lifetime strategy.
+  sword-stab sheet cropped to centered 48 x 48 frames, and an air-spin sheet.
+  The selected character's decoded 16-bit animation frames occupy a fixed
+  270 KiB main-RAM cache; one 48 x 48 VDP1 sprite is replaced only when the
+  animation frame changes. X reloads the cache for the next character and
+  pauses CD audio during file access. Physics tuning and accumulated subpixel
+  movement use Jo's Q16.16 `jo_fixed` representation.
 - Player ground collision uses `jo_map_per_pixel_vertical_collision()` at the
   visible feet and Jo's Sonic-style gravity/jump helpers. Ground and slope
   response comes from collision-mask pixels rather than map attributes.

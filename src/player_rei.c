@@ -7,13 +7,13 @@
 
 static const player_animation_definition g_animations[] =
 {
-    { PLAYER_ANIMATION_IDLE, "IDLE.BIN", 15, 48, 48, 6, true },
-    { PLAYER_ANIMATION_RUN, "RUN.BIN", 8, 48, 48, 4, true },
-    { PLAYER_ANIMATION_JUMP, "JUMP.BIN", 6, 48, 48, 4, true },
-    { PLAYER_ANIMATION_WALL, "WALL.BIN", 6, 48, 48, 4, true },
-    { PLAYER_ANIMATION_ROLL, "ROLL.BIN", 7, 48, 48, 3, true },
-    { PLAYER_ANIMATION_SHOOT, "SHOOT.BIN", 10, 48, 48, 3, false },
-    { PLAYER_ANIMATION_SHOOT_MOVE, "RSHOOT.BIN", 8, 48, 48, 3, false }
+    { PLAYER_ANIMATION_IDLE, "IDLE.BIN", 15, 48, 48, 48, 0, 6, true },
+    { PLAYER_ANIMATION_RUN, "RUN.BIN", 8, 48, 48, 48, 0, 4, true },
+    { PLAYER_ANIMATION_JUMP, "JUMP.BIN", 6, 48, 48, 48, 0, 4, true },
+    { PLAYER_ANIMATION_WALL, "WALL.BIN", 6, 48, 48, 48, 0, 4, true },
+    { PLAYER_ANIMATION_ROLL, "ROLL.BIN", 7, 48, 48, 48, 0, 3, true },
+    { PLAYER_ANIMATION_SHOOT, "SHOOT.BIN", 10, 48, 48, 48, 0, 3, false },
+    { PLAYER_ANIMATION_SHOOT_MOVE, "RSHOOT.BIN", 8, 48, 48, 48, 0, 3, false }
 };
 
 static const player_character_definition g_rei =

@@ -19,9 +19,10 @@ typedef struct
     jo_fixed horizontal_remainder;
     jo_fixed vertical_remainder;
     unsigned char animation_frame_skip;
+    unsigned short animation_frame;
     int x;
     int y;
-    int active_animation_id;
+    int active_animation_slot;
     int character_index;
     bool down_move_active;
     bool attack_animation_active;

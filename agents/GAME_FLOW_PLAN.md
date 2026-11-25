@@ -185,12 +185,14 @@ animation added)/`, belong to these character sets:
 | Both | Jump | `Jump/player new jump 48x48.png` |
 | Both | Wall cling | `Wall Land/player wall land 48x48.png` |
 
-Jo Engine sprite memory is limited VDP1 VRAM. Keep only the selected
-character's animation sheets loaded; replace that character's sprite block
-when switching rather than loading every animation set at startup. Because
-Jo Engine frees sprites from an ID through the end of the sprite list, this
-approach requires character sprites to remain the last allocated block or a
-future resource manager to handle dependent sprite lifetimes explicitly.
+Jo Engine sprite memory is limited VDP1 VRAM. Keep animation frame pixels for
+the selected character in main RAM and use a single replaceable 48 x 48 VDP1
+sprite for drawing, uploading a frame only when the animation changes frame.
+Load the next character's sheets into the same RAM cache when switching; pause
+CD audio during file access. Crop the 96 x 48 sword-stab source frames to
+centered 48 x 48 frames for the shared sprite slot. The player animation cache
+is currently a fixed 270 KiB allocation; keep its capacity and the Jo Engine
+dynamic heap budget in mind as animations are added.
 
 Keep the shared action definitions and behavior consistent between characters.
 Exact directional-input rules and action timing,

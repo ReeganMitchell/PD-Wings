@@ -7,13 +7,13 @@
 
 static const player_animation_definition g_animations[] =
 {
-    { PLAYER_ANIMATION_IDLE, "IDLE.BIN", 10, 48, 48, 6, true },
-    { PLAYER_ANIMATION_RUN, "RUN.BIN", 8, 48, 48, 4, true },
-    { PLAYER_ANIMATION_JUMP, "JUMP.BIN", 6, 48, 48, 4, true },
-    { PLAYER_ANIMATION_WALL, "WALL.BIN", 6, 48, 48, 4, true },
-    { PLAYER_ANIMATION_SLIDE, "SLIDE.BIN", 8, 48, 48, 3, true },
-    { PLAYER_ANIMATION_ATTACK_GROUND, "STAB.BIN", 7, 96, 48, 3, false },
-    { PLAYER_ANIMATION_ATTACK_AIR, "SPIN.BIN", 6, 48, 48, 3, false }
+    { PLAYER_ANIMATION_IDLE, "IDLE.BIN", 10, 48, 48, 48, 0, 6, true },
+    { PLAYER_ANIMATION_RUN, "RUN.BIN", 8, 48, 48, 48, 0, 4, true },
+    { PLAYER_ANIMATION_JUMP, "JUMP.BIN", 6, 48, 48, 48, 0, 4, true },
+    { PLAYER_ANIMATION_WALL, "WALL.BIN", 6, 48, 48, 48, 0, 4, true },
+    { PLAYER_ANIMATION_SLIDE, "SLIDE.BIN", 8, 48, 48, 48, 0, 3, true },
+    { PLAYER_ANIMATION_ATTACK_GROUND, "STAB.BIN", 7, 48, 48, 96, 24, 3, false },
+    { PLAYER_ANIMATION_ATTACK_AIR, "SPIN.BIN", 6, 48, 48, 48, 0, 3, false }
 };
 
 static const player_character_definition g_sam =

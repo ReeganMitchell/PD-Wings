@@ -25,6 +25,8 @@ typedef struct
     unsigned short frame_count;
     unsigned short frame_width;
     unsigned short frame_height;
+    unsigned short source_frame_width;
+    unsigned short crop_x;
     unsigned char frame_rate;
     bool loops;
 } player_animation_definition;

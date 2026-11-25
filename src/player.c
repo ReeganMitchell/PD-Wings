@@ -16,19 +16,23 @@
 #define PLAYER_STEP_UP_MAX          (8)
 #define PLAYER_STEP_DOWN_MAX        (8)
 #define JUMP_PER_PIXEL_TOLERANCE    (20)
-#define PLAYER_MAX_ANIMATION_FRAMES (15)
+#define PLAYER_RAM_FRAME_CAPACITY   (60)
+#define PLAYER_ANIMATION_FRAME_SIZE (GAME_PLAYER_WIDTH * GAME_PLAYER_WIDTH)
 #define PLAYER_DRAW_DEPTH           (250)
 
 typedef struct
 {
     const player_character_definition *definition;
-    int animation_ids[PLAYER_ANIMATION_COUNT];
-    int first_sprite_id;
-    int last_sprite_id;
-    bool loaded;
+    unsigned short frame_offsets[PLAYER_ANIMATION_COUNT];
 } player_character_runtime;
 
 static player_character_runtime g_characters[2];
+static jo_color g_player_frame_cache[PLAYER_RAM_FRAME_CAPACITY]
+                                    [PLAYER_ANIMATION_FRAME_SIZE];
+static unsigned short g_player_cached_frame_count;
+static int g_player_sprite_id = -1;
+static int g_uploaded_animation_slot = -1;
+static unsigned short g_uploaded_animation_frame;
 
 static const player_character_definition *current_character(
     const player_state *player)
@@ -42,46 +46,11 @@ static player_character_runtime *current_character_runtime(
     return &g_characters[player->character_index];
 }
 
-static int find_animation_id(const player_character_runtime *character,
-                             player_animation_slot slot)
-{
-    return character->animation_ids[slot];
-}
-
-static bool unload_character_animations(player_character_runtime *character)
-{
-    unsigned int i;
-
-    if (!character->loaded)
-        return true;
-    if (jo_get_last_sprite_id() != character->last_sprite_id)
-    {
-        jo_core_error(
-            "Cannot unload %s animations: player sprites are not the last "
-            "sprites loaded",
-            character->definition->name);
-        return false;
-    }
-
-    for (i = 0; i < PLAYER_ANIMATION_COUNT; ++i)
-    {
-        if (character->animation_ids[i] >= 0)
-        {
-            jo_remove_sprite_anim(character->animation_ids[i]);
-            character->animation_ids[i] = -1;
-        }
-    }
-    jo_sprite_free_from(character->first_sprite_id);
-    character->loaded = false;
-    character->first_sprite_id = -1;
-    character->last_sprite_id = -1;
-    return true;
-}
-
 static bool load_character_animations(player_character_runtime *character)
 {
+    jo_img sheet = { 0 };
     unsigned int i;
-    bool success = true;
+    bool success = false;
 
     if (!jo_fs_cd("CHAR"))
     {
@@ -99,82 +68,95 @@ static bool load_character_animations(player_character_runtime *character)
         return false;
     }
 
-    for (i = 0; i < PLAYER_ANIMATION_COUNT; ++i)
-        character->animation_ids[i] = -1;
-    character->first_sprite_id = jo_get_last_sprite_id() + 1;
-    character->last_sprite_id = -1;
-    character->loaded = false;
+    g_player_cached_frame_count = 0;
 
     for (i = 0; i < character->definition->animation_count; ++i)
     {
         const player_animation_definition *animation =
             &character->definition->animations[i];
-        jo_tile tiles[PLAYER_MAX_ANIMATION_FRAMES];
         unsigned int frame;
-        int sprite_id;
+        unsigned int expected_width =
+            animation->frame_count * animation->source_frame_width;
 
-        if (animation->frame_count > PLAYER_MAX_ANIMATION_FRAMES)
+        if (animation->frame_width != GAME_PLAYER_WIDTH ||
+            animation->frame_height != GAME_PLAYER_WIDTH ||
+            animation->source_frame_width < animation->frame_width ||
+            animation->crop_x + animation->frame_width >
+                animation->source_frame_width)
         {
-            jo_core_error("%s animation %s has too many frames",
+            jo_core_error("%s animation %s has invalid frame dimensions",
                           character->definition->name,
                           animation->filename);
-            success = false;
             break;
         }
-        for (frame = 0; frame < animation->frame_count; ++frame)
+        if (g_player_cached_frame_count + animation->frame_count >
+            PLAYER_RAM_FRAME_CAPACITY)
         {
-            tiles[frame].x = frame * animation->frame_width;
-            tiles[frame].y = 0;
-            tiles[frame].width = animation->frame_width;
-            tiles[frame].height = animation->frame_height;
+            jo_core_error("%s animation cache exceeds its RAM capacity",
+                          character->definition->name);
+            break;
         }
-        sprite_id = jo_sprite_add_bin_tileset(
-            JO_CURRENT_DIR, animation->filename, JO_COLOR_Green, tiles,
-            animation->frame_count);
-        if (sprite_id < 0)
+        if (!jo_bin_loader(&sheet, JO_CURRENT_DIR, animation->filename,
+                           JO_COLOR_Green))
         {
             jo_core_error("Failed to load %s animation %s: %s",
                           character->definition->name,
                           animation->filename, jo_get_last_error());
-            success = false;
             break;
         }
-        character->animation_ids[animation->slot] = jo_create_sprite_anim(
-            (unsigned short)sprite_id, animation->frame_count,
-            animation->frame_rate);
-        if (character->animation_ids[animation->slot] < 0)
+        if (sheet.width != expected_width ||
+            sheet.height != animation->frame_height)
         {
-            jo_core_error("Failed to create %s animation %s",
+            jo_core_error("%s animation %s has dimensions %dx%d; expected "
+                          "%dx%d",
                           character->definition->name,
-                          animation->filename);
-            success = false;
+                          animation->filename,
+                          (int)sheet.width, (int)sheet.height,
+                          (int)expected_width,
+                          (int)animation->frame_height);
+            jo_free_img(&sheet);
             break;
         }
+        character->frame_offsets[animation->slot] =
+            g_player_cached_frame_count;
+        for (frame = 0; frame < animation->frame_count; ++frame)
+        {
+            unsigned int row;
+            unsigned int source_x =
+                frame * animation->source_frame_width + animation->crop_x;
+            jo_color *destination =
+                g_player_frame_cache[g_player_cached_frame_count + frame];
+
+            for (row = 0; row < animation->frame_height; ++row)
+            {
+                const jo_color *source =
+                    (const jo_color *)sheet.data +
+                    row * sheet.width + source_x;
+
+                jo_memcpy(destination + row * animation->frame_width,
+                          source,
+                          animation->frame_width * sizeof(jo_color));
+            }
+        }
+        g_player_cached_frame_count += animation->frame_count;
+        jo_free_img(&sheet);
     }
-    if (success)
-    {
-        character->last_sprite_id = jo_get_last_sprite_id();
-        character->loaded = true;
-    }
+    if (i == character->definition->animation_count)
+        success = true;
 
     if (!jo_fs_cd(JO_PARENT_DIR))
     {
         jo_core_error("Failed to return from %s character directory: %s",
                       character->definition->name, jo_get_last_error());
-        success = false;
+        return false;
     }
     else if (!jo_fs_cd(JO_PARENT_DIR))
     {
         jo_core_error("Failed to return to CD root: %s", jo_get_last_error());
-        success = false;
+        return false;
     }
-    if (!success && character->first_sprite_id <= jo_get_last_sprite_id())
-    {
-        character->last_sprite_id = jo_get_last_sprite_id();
-        character->loaded = true;
-        if (!unload_character_animations(character))
-            return false;
-    }
+    if (success)
+        g_uploaded_animation_slot = -1;
     return success;
 }
 
@@ -341,6 +323,7 @@ static bool has_wall_at_map_x(const game_state *game,
 bool player_load_assets(player_state *player)
 {
     unsigned int i;
+    jo_img initial_frame;
 
     g_characters[0].definition = player_rei_definition();
     g_characters[1].definition = player_sam_definition();
@@ -348,16 +331,26 @@ bool player_load_assets(player_state *player)
     {
         unsigned int animation;
 
-        g_characters[i].first_sprite_id = -1;
-        g_characters[i].last_sprite_id = -1;
-        g_characters[i].loaded = false;
         for (animation = 0; animation < PLAYER_ANIMATION_COUNT; ++animation)
-            g_characters[i].animation_ids[animation] = -1;
+            g_characters[i].frame_offsets[animation] = 0;
     }
     player->character_index = 0;
     if (!load_character_animations(&g_characters[player->character_index]))
         return false;
-    player->active_animation_id = -1;
+    initial_frame.width = GAME_PLAYER_WIDTH;
+    initial_frame.height = GAME_PLAYER_WIDTH;
+    initial_frame.data = g_player_frame_cache[0];
+    g_player_sprite_id = jo_sprite_add(&initial_frame);
+    if (g_player_sprite_id < 0)
+    {
+        jo_core_error("Failed to allocate player sprite: %s",
+                      jo_get_last_error());
+        return false;
+    }
+    player->active_animation_slot = -1;
+    player->animation_frame = 0;
+    player->animation_frame_skip = 0;
+    g_uploaded_animation_slot = -1;
     player->down_move_active = false;
     player->attack_animation_active = false;
     return true;
@@ -365,10 +358,6 @@ bool player_load_assets(player_state *player)
 
 void player_reset(player_state *player)
 {
-    player_character_runtime *character =
-        current_character_runtime(player);
-    unsigned int animation;
-
     player->x = PLAYER_START_X;
     player->y = PLAYER_START_Y;
     player->facing_left = false;
@@ -377,15 +366,10 @@ void player_reset(player_state *player)
     player->horizontal_remainder = JO_FIXED_0;
     player->vertical_remainder = JO_FIXED_0;
     player->animation_frame_skip = 0;
-    for (animation = 0; animation < PLAYER_ANIMATION_COUNT; ++animation)
-    {
-        if (character->animation_ids[animation] >= 0)
-            jo_reset_sprite_anim(character->animation_ids[animation]);
-    }
+    player->animation_frame = 0;
     player->down_move_active = false;
     player->attack_animation_active = false;
-    player->active_animation_id = find_animation_id(
-        current_character_runtime(player), PLAYER_ANIMATION_IDLE);
+    player->active_animation_slot = -1;
     jo_physics_init_for_sonic(&player->physics);
     player->physics.max_speed =
         JO_INT_TO_FIXED(current_character(player)->max_speed);
@@ -404,22 +388,20 @@ bool player_select_next_character(player_state *player)
     unsigned int character_count =
         sizeof(g_characters) / sizeof(g_characters[0]);
 
-    if (!unload_character_animations(
-            current_character_runtime(player)))
-        return false;
-    player->active_animation_id = -1;
     player->character_index = (player->character_index + 1) %
         character_count;
     if (!load_character_animations(current_character_runtime(player)))
     {
         player->character_index = previous_character_index;
         if (!load_character_animations(current_character_runtime(player)))
-            jo_core_error("Failed to restore %s character animations",
+            jo_core_error("Failed to restore %s animation data",
                           previous_character->name);
         return false;
     }
     player->attack_animation_active = false;
-    player->active_animation_id = -1;
+    player->active_animation_slot = -1;
+    player->animation_frame = 0;
+    player->animation_frame_skip = 0;
     player->y += previous_character->sprite_height -
         current_character(player)->sprite_height;
     player->physics.max_speed =
@@ -527,9 +509,8 @@ void player_update_animation(player_state *player)
     const player_animation_definition *animation;
     player_animation_slot slot;
     bool is_attack_animation = false;
-    int animation_id;
     unsigned char frame_rate;
-    unsigned short frame;
+    unsigned short next_frame;
 
     if (player->attack_animation_active)
     {
@@ -565,14 +546,10 @@ void player_update_animation(player_state *player)
     if (animation == JO_NULL)
         return;
 
-    animation_id = find_animation_id(runtime, slot);
-
-    if (animation_id != player->active_animation_id)
+    if ((int)slot != player->active_animation_slot)
     {
-        if (player->active_animation_id >= 0)
-            jo_reset_sprite_anim(player->active_animation_id);
-        jo_reset_sprite_anim(animation_id);
-        player->active_animation_id = animation_id;
+        player->active_animation_slot = slot;
+        player->animation_frame = 0;
         player->animation_frame_skip = 0;
     }
     frame_rate = animation->frame_rate;
@@ -582,40 +559,62 @@ void player_update_animation(player_state *player)
 
         frame_rate = (unsigned char)(9 - JO_MIN(speed_step, 6));
     }
-    jo_set_sprite_anim_frame_rate(animation_id, frame_rate);
     if (player->animation_frame_skip >= frame_rate)
     {
         player->animation_frame_skip = 0;
-        frame = (unsigned short)(jo_get_sprite_anim_frame(animation_id) + 1);
-        if (frame >= jo_get_sprite_anim_frame_count(animation_id))
+        next_frame = player->animation_frame + 1;
+        if (next_frame >= animation->frame_count)
         {
             if (animation->loops)
-                frame = 0;
+                next_frame = 0;
             else
             {
-                frame = (unsigned short)(
-                    jo_get_sprite_anim_frame_count(animation_id) - 1);
+                next_frame = animation->frame_count - 1;
                 if (is_attack_animation)
                     player->attack_animation_active = false;
             }
         }
-        jo_set_sprite_anim_frame(animation_id, frame);
+        player->animation_frame = next_frame;
     }
     else
         ++player->animation_frame_skip;
+
+    if (g_uploaded_animation_slot != (int)slot ||
+        g_uploaded_animation_frame != player->animation_frame)
+    {
+        unsigned int cache_index =
+            runtime->frame_offsets[slot] + player->animation_frame;
+        jo_img frame_image;
+
+        if (cache_index >= g_player_cached_frame_count)
+        {
+            jo_core_error("%s animation frame is outside cached RAM data",
+                          character->name);
+            return;
+        }
+        frame_image.width = GAME_PLAYER_WIDTH;
+        frame_image.height = GAME_PLAYER_WIDTH;
+        frame_image.data = g_player_frame_cache[cache_index];
+        if (jo_sprite_replace(&frame_image, g_player_sprite_id) < 0)
+        {
+            jo_core_error("Failed to upload %s animation frame",
+                          character->name);
+            return;
+        }
+        g_uploaded_animation_slot = slot;
+        g_uploaded_animation_frame = player->animation_frame;
+    }
 }
 
 void player_draw(const player_state *player)
 {
-    int sprite_id;
-
-    if (player->active_animation_id < 0)
+    if (g_player_sprite_id < 0)
         return;
-    sprite_id = jo_get_anim_sprite(player->active_animation_id);
 
     if (player->facing_left)
         jo_sprite_enable_horizontal_flip();
-    jo_sprite_draw3D2(sprite_id, player->x, player->y, PLAYER_DRAW_DEPTH);
+    jo_sprite_draw3D2(g_player_sprite_id, player->x, player->y,
+                      PLAYER_DRAW_DEPTH);
     if (player->facing_left)
         jo_sprite_disable_horizontal_flip();
 }
