@@ -75,7 +75,16 @@ version is identical.
   The selected character's decoded 16-bit animation frames occupy a fixed
   270 KiB main-RAM cache; one 48 x 48 VDP1 sprite is replaced only when the
   animation frame changes. X reloads the cache for the next character and
-  pauses CD audio during file access. Physics tuning and accumulated subpixel
+  pauses CD audio during file access. The frame data can be shared by multiple
+  instances of the same character type in main RAM. VDP1 textures, however,
+  must remain resident while the frame's draw commands use them: instances
+  showing the same frame can share one texture slot, while instances showing
+  different frames at the same time need a resident slot for each distinct
+  frame. The current player implementation has only one replaceable sprite
+  slot and is intended for a single on-screen player; supporting multiple
+  independently animated enemies requires managing multiple simultaneously
+  resident frame slots. Budget those slots against VDP1 memory and the shared
+  frame cache against main RAM. Physics tuning and accumulated subpixel
   movement use Jo's Q16.16 `jo_fixed` representation.
 - Player ground collision uses `jo_map_per_pixel_vertical_collision()` at the
   visible feet and Jo's Sonic-style gravity/jump helpers. Ground and slope
